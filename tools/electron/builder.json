@@ -1,4 +1,6 @@
 { "appId": "io.github.froodyofficial.grannyxdbd", "productName": "Granny x DBD", "directories": { "output": "dist" },
-  "win": { "target": [{ "target": "portable", "arch": ["x64"] }], "icon": "icon.ico", "signAndEditExecutable": false },
-  "portable": { "artifactName": "GrannyxDBD.exe", "unpackDirName": "GrannyxDBD", "splashImage": null },
+  "win": { "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }], "icon": "icon.ico", "signAndEditExecutable": false },
+  "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": "always", "createStartMenuShortcut": true, "shortcutName": "Granny x DBD",
+    "runAfterFinish": true, "deleteAppDataOnUninstall": false, "artifactName": "GrannyxDBD-Setup.exe", "installerIcon": "icon.ico", "uninstallerIcon": "icon.ico" },
+  "portable": { "artifactName": "GrannyxDBD.exe", "unpackDirName": "GrannyxDBD", "splashImage": "splash.bmp" },
   "compression": "normal" }
