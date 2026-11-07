@@ -1,0 +1,17 @@
+# dependencies and build outputs (rebuild with the commands in CLAUDE.md)
+node_modules/
+tools/electron/dist/
+tools/electron/out/
+tools/electron/app/
+tools/app/
+tools/android/build/
+tools/android/*.apk
+tools/android/*.idsig
+tools/android/assets/
+apktest/
+GrannyDBD.html
+trailer-capture.html
+*.zip
+
+# signing key: never in the repo (keep it safe yourself)
+tools/android/*.jks

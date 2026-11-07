@@ -1,0 +1,4 @@
+{ "appId": "io.github.froodyofficial.grannyxdbd", "productName": "Granny x DBD", "directories": { "output": "dist" },
+  "win": { "target": [{ "target": "portable", "arch": ["x64"] }], "icon": "icon.ico", "signAndEditExecutable": false },
+  "portable": { "artifactName": "GrannyxDBD.exe", "unpackDirName": "GrannyxDBD", "splashImage": null },
+  "compression": "normal" }

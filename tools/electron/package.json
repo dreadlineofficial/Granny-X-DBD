@@ -1,0 +1,1 @@
+{"name":"grannyxdbd","productName":"Granny x DBD","version":"1.0.1","description":"Granny x DBD","main":"main.js","author":"froodyofficial-maker","license":"UNLICENSED","devDependencies":{"@electron/packager":"^18.3.6","electron":"^33.2.1","electron-builder":"^25.1.8"}}

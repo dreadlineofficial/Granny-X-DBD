@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Granny x DBD</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23120a0c'/%3E%3Cpath d='M32 10c-9 8-14 16-14 24a14 14 0 0 0 28 0c0-8-5-16-14-24z' fill='%23b3201e'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }</script>
+</head>
+<body>
+  <div id="game"></div>
+
+  <!-- shown if the game scripts can't start (e.g. index.html opened straight from disk) -->
+  <div id="boot-loading"><div class="bl-title">Granny × DBD</div><div class="bl-bar"><i></i></div><div class="bl-sub">Entering the fog…</div></div>
+  <div id="boot-error" class="hidden">
+    <div class="be-box">
+      <h2>The fog won't lift…</h2>
+      <p>The game didn't start. First try a hard refresh (<b>Ctrl+F5</b>, or <b>Cmd+Shift+R</b> on Mac).</p>
+      <p>If you opened <b>public/index.html</b> straight from a folder, your browser blocks its scripts: double-click <b>GrannyDBD.html</b> in the main folder instead. It runs offline with no setup.</p>
+      <p id="boot-detail" class="be-detail"></p>
+      <p><b>For online play over your network:</b> run <code>node server.js</code> (or <b>start-windows.bat</b> / <b>start-mac.command</b>) and open <code>http://localhost:8090</code>.</p>
+    </div>
+  </div>
+
+  <!-- ================= MAIN MENU ================= -->
+  <div id="menu">
+    <div class="m-vignette"></div>
+    <div class="m-grain"></div>
+    <header class="logo">
+      <h1>Granny <i class="x-mark">×</i> DBD</h1>
+      <p>You have one night. She hears everything.</p>
+    </header>
+
+    <nav id="mainnav" class="mainnav">
+      <button data-act="play-survivor" data-scene="survivor"><span>Play as Survivor</span><small>Quick match against bots</small></button>
+      <button data-act="play-killer" data-scene="killer"><span>Play as Killer</span><small>Hunt down bot survivors</small></button>
+      <button data-act="online"><span>Online Match</span><small>Host a lobby or join friends</small></button>
+      <button data-act="loadout"><span>Loadout</span><small>Characters &amp; perks</small></button>
+      <button data-act="store"><span>Store</span><small>Outfits &amp; perks</small></button>
+      <button data-act="settings"><span>Settings</span><small>Graphics, controls, audio</small></button>
+      <button data-act="help"><span>How to Play</span><small>Rules &amp; controls</small></button>
+    </nav>
+
+    <div class="showcase" id="showcase"></div>
+        <div class="topright"><button class="inbox-btn friends-btn" id="friends-btn" title="Friends"><span class="fr-ico"></span><span class="badge hidden" id="friends-badge"></span></button><button class="inbox-btn" id="inbox-btn" title="Inbox"><span class="ib-ico"></span><span class="badge hidden" id="inbox-badge"></span></button><div class="profile" id="profile"></div></div>
+    <div class="last-updated" id="last-updated" title=""></div>
+    <div id="show-drag" class="hidden"><span>Drag to rotate · Scroll to zoom</span></div>
+
+    <aside id="panel" class="panel hidden">
+      <div class="panel-head"><h2 id="panel-title"></h2><button class="x" id="panel-close" aria-label="Close">✕</button></div>
+      <div class="panel-body">
+        <!-- bot match -->
+        <section id="p-play" class="hidden">
+          <div class="field"><label>Game mode</label><select id="bots-gm"></select></div>
+          <p class="hint gm-desc" id="bots-gm-desc"></p>
+          <div class="field"><label>Role</label>
+            <div class="seg" id="bots-role"><button data-v="survivor" class="on">Survivor</button><button data-v="killer">Killer</button></div></div>
+          <div class="field" id="bots-teammates-row"><label>Bot teammates</label>
+            <div class="seg" id="bots-team"><button data-v="0">0</button><button data-v="1">1</button><button data-v="2">2</button><button data-v="3" class="on">3</button></div></div>
+          <div class="field hidden" id="bots-survivors-row"><label>Survivors to hunt</label>
+            <div class="seg" id="bots-surv"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4" class="on">4</button></div></div>
+          <div class="field" id="bots-killer-row"><label>Bot killer</label>
+            <select id="bots-killer"><option value="granny">Granny</option></select></div>
+          <div class="field"><label>Bot difficulty</label>
+            <div class="seg" id="bots-diff"><button data-v="easy">Easy</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Hard</button></div></div>
+          <div class="field"><label>Map</label>
+            <select id="bots-map"><option value="granny">Granny's House</option></select></div>
+          <div class="loadout-mini" id="bots-loadout"></div>
+          <div class="actions"><button class="btn primary big" id="btn-bots-start">Ready</button></div>
+        </section>
+
+        <section id="p-test" class="hidden">
+          <p class="hint">Try any character, outfit, perk and power level for free. Test matches give no XP, Embers or rank.</p>
+          <div class="field"><label>Role</label><div class="seg" id="test-role"><button data-v="survivor" class="on">Survivor</button><button data-v="killer">Killer</button></div></div>
+          <div class="test-grid">
+            <div class="field"><label>Character</label><select id="test-char"></select></div>
+            <div class="field"><label>Outfit</label><select id="test-skin"></select></div>
+            <div class="field" id="test-item-row"><label>Item</label><select id="test-item"><option value="flashlight">Flashlight</option><option value="taser">Taser</option></select></div>
+            <div class="field hidden" id="test-reach-row"><label id="test-reach-l">Power reach</label><input type="range" id="test-reach"></div>
+            <div class="field" id="test-opp-row"><label>Bot killer</label><select id="test-opp"></select></div>
+            <div class="field hidden" id="test-surv-row"><label>Survivors to hunt</label><div class="seg" id="test-surv"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4" class="on">4</button></div></div>
+            <div class="field"><label>Map</label><select id="test-map"></select></div>
+            <div class="field"><label>Game mode</label><select id="test-gm"></select></div>
+            <div class="field"><label>Bots</label><div class="seg" id="test-bots"><button data-v="normal" class="on">Normal</button><button data-v="passive">Passive (killers can't hurt)</button></div></div>
+            <div class="field"><label>Bot difficulty</label><div class="seg" id="test-diff"><button data-v="easy">Easy</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Hard</button></div></div>
+          </div>
+          <div class="lo-sub"><span>Perks</span><span id="test-perk-n"></span></div>
+          <div class="test-perks" id="test-perks"></div>
+          <div class="actions"><button class="btn primary big" id="btn-test-start">Start testing</button></div>
+        </section>
+
+        <!-- online -->
+        <section id="p-online" class="hidden">
+          <div class="online-grid">
+            <div class="ocard">
+              <h3>Host a match</h3>
+              <p class="hint">Create a lobby and share the 5-letter code. Empty slots can be filled with bots.</p>
+              <button class="btn primary" id="btn-host">Create Lobby</button>
+            </div>
+            <div class="ocard">
+              <h3>Join a match</h3>
+              <input id="join-code" class="code-input" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false">
+              <button class="btn primary" id="btn-join">Join</button>
+            </div>
+          </div>
+          <p class="hint" id="join-mode"></p>
+        </section>
+
+        <!-- lobby -->
+        <section id="p-lobby" class="hidden">
+          <div class="lobby-top"><div>Room code <span class="code" id="lobby-code"></span></div><button class="btn small" id="btn-copy">Copy invite link</button></div>
+          <p class="hint" id="lobby-mode"></p>
+          <p class="hint gm-desc" id="lobby-gm-desc"></p>
+          <div class="lobby-grid">
+            <div>
+              <div class="slots" id="lobby-slots"></div>
+              <div class="map-vote hidden" id="map-vote"></div>
+              <div class="host-opts" id="lobby-host-opts">
+                <div class="field"><label>Game mode</label><select id="lobby-gm"></select></div>
+                <label class="check"><input type="checkbox" id="lobby-fill" checked> Fill empty slots with bots</label>
+                <div class="field"><label>Map</label><select id="lobby-map"><option value="granny">Granny's House</option></select></div>
+                <div class="field"><label>Bot difficulty</label><div class="seg" id="lobby-diff"><button data-v="easy">Easy</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Hard</button></div></div>
+              </div>
+              <div class="chat"><div id="chat-log"></div><input id="chat-in" maxlength="120" placeholder="Say something… (Enter)"></div>
+            </div>
+            <div>
+              <div class="field"><label>Your role</label><div class="seg" id="lobby-role"><button data-v="survivor" class="on">Survivor</button><button data-v="killer">Killer</button></div></div>
+              <div class="loadout-mini" id="lobby-loadout"></div>
+            </div>
+          </div>
+          <div class="actions"><button class="btn" id="btn-leave-lobby">Leave</button><span class="hint" id="lobby-wait">Waiting for the host to start…</span><button class="btn primary big" id="btn-lobby-start">Start Match</button></div>
+        </section>
+
+        <!-- loadout -->
+        <section id="p-loadout" class="hidden">
+          <div class="seg tabs" id="lo-tab"><button data-v="survivor" class="on">Survivor</button><button data-v="killer">Killer</button></div>
+          <div id="lo-body"></div>
+        </section>
+
+        <!-- store -->
+        <!-- inbox -->
+        <section id="p-inbox" class="hidden"><div id="inbox-list"></div></section>
+
+        <!-- settings -->
+        <section id="p-settings" class="hidden">
+          <div class="field"><label>Player name</label><input id="set-name" maxlength="16"></div>
+          <div class="field news-opt hidden" id="news-opt"><label class="check"><input type="checkbox" id="news-on"> Get the latest updates and news by email</label>
+            <div class="news-form hidden" id="news-form"><p class="hint">Big updates only: new characters, limited editions, new modes and what changed. Small tweaks are never emailed. Every email has an unsubscribe link.</p>
+              <div class="news-row"><input id="news-email" type="email" maxlength="120" placeholder="you@example.com" autocomplete="email"><button class="btn primary" id="news-send">Subscribe</button></div>
+              <label class="check"><input type="checkbox" id="news-age"> I am 13 or older</label>
+              <p class="hint" id="news-msg"></p></div></div>
+          <div class="field"><label>Graphics quality</label>
+            <div class="seg" id="set-quality"><button data-v="potato">Very Low</button><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button></div>
+            <p class="hint" id="set-quality-hint"></p></div>
+          <div class="field"><label>Visual style</label>
+            <div class="seg" id="set-style"><button data-v="realistic">Realistic</button><button data-v="classic">Classic</button></div>
+            <p class="hint" id="set-style-hint"></p></div>
+          <label class="check"><input type="checkbox" id="set-dynres"> Dynamic resolution (keeps the frame rate smooth on slower laptops)</label>
+          <label class="check"><input type="checkbox" id="set-fps"> Show FPS counter</label>
+          <div class="field"><label>Brightness <span id="set-bright-v">100%</span></label><input type="range" id="set-bright" min="0.6" max="1.8" step="0.05" value="1"></div>
+          <div class="field"><label>Mouse sensitivity <b id="set-sens-v"></b></label><input type="range" id="set-sens" min="0.2" max="3" step="0.05"></div>
+          <div class="field"><label>Field of view <b id="set-fov-v"></b></label><input type="range" id="set-fov" min="60" max="100" step="1"></div>
+          <div class="field cam-block"><label>Camera position <span class="hint-inline">(third person: the Swap camera shoulder key flips sides in a match)</span></label>
+            <div class="seg" data-cam="side"><button data-v="-1">Left shoulder</button><button data-v="0">Centered</button><button data-v="1">Right shoulder</button></div></div>
+          <div class="field"><label>Camera distance <b data-camv="dist"></b></label><input type="range" data-cam="dist" min="0.6" max="1.6" step="0.05"></div>
+          <div class="field"><label>Camera height <b data-camv="height"></b></label><input type="range" data-cam="height" min="-0.5" max="0.8" step="0.05"></div>
+          <div class="field"><label>Camera angle <b data-camv="angle"></b></label><input type="range" data-cam="angle" min="-60" max="60" step="5"></div>
+          <button class="btn small" data-cam="reset">Reset camera</button>
+          <div class="field"><label>Master volume</label><input type="range" id="set-vol" min="0" max="1" step="0.01"></div>
+          <div class="field"><label>Music &amp; ambience</label><input type="range" id="set-music" min="0" max="1" step="0.01"></div>
+          <label class="check"><input type="checkbox" id="set-invert"> Invert mouse Y</label>
+          <label class="check hidden"><input type="checkbox" id="set-subs"></label>
+          <div class="field"><label>Keybinds <span class="hint-inline">(click an action, then press a key · Esc cancels)</span></label>
+            <div id="keybinds" class="keybinds"></div>
+            <button class="btn small" id="keys-reset">Reset keybinds</button></div>
+          <div class="field"><label>Online connection</label><select id="set-net"><option value="auto">Auto (game server if available, otherwise online)</option><option value="relay">Game server only (node server.js)</option><option value="p2p">Online (direct WebRTC + relay fallback)</option></select></div>
+        </section>
+
+        <!-- help -->
+        <section id="p-pass" class="hidden"><div id="pass-body"></div></section>
+        <section id="p-friends" class="hidden"><div id="friends-body"></div></section>
+        <section id="p-help" class="hidden">
+          <div class="help">
+            <div>
+              <h3>Survivors</h3>
+              <p>You wake up in Granny's House. Repair <b>generators</b> to power the exit gates, open a gate and escape before she finds you.</p>
+              <ul>
+                <li><kbd>WASD</kbd> move · <kbd>Shift</kbd> run · <kbd>Ctrl</kbd>/<kbd>C</kbd> crouch. Running is loud: she hears it.</li>
+                <li>Hold <kbd>E</kbd>: repair generators, heal, unhook survivors, open the gates</li>
+                <li><kbd>Space</kbd>: vault, drop barricades on her, hit skill checks. A failed skill check is heard anywhere.</li>
+                <li><kbd>RMB</kbd> flashlight: blind her for a moment</li>
+                <li>When carried, alternate <kbd>A</kbd> / <kbd>D</kbd> to struggle free</li>
+                <li>Two hits put you down. Hang on a hook too long, or get hooked a second time, and the Entity comes for you: hit its skill checks. A third hook is fatal. <kbd>Space</kbd> on your first hook to try to unhook yourself (3 tries, 4% each).</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Granny</h3>
+              <ul>
+                <li><kbd>LMB</kbd> swing the bat · hold <kbd>E</kbd>: pick up, hook, damage generators, break barricades</li>
+                <li>Hold <kbd>RMB</kbd> <b>Bat Rush</b>: wind up, release to charge. The longer you hold, the farther she goes.</li>
+                <li><kbd>R</kbd> <b>I Hear You</b>: everyone running, repairing, healing or unhooking is revealed</li>
+                <li>Hold <kbd>G</kbd> <b>Creep</b>: vanish and reappear at a window, pallet, generator or hook</li>
+                <li><kbd>V</kbd> <b>Body Swap</b>: switch places with Spider Mom (hold to look through her eyes first)</li>
+                <li><kbd>F</kbd> <b>Bedtime Trap</b> execution · <kbd>Q</kbd> drop a survivor · <kbd>Space</kbd> vault</li>
+                <li><b>Grandpa</b> outfit: hold <kbd>RMB</kbd> to raise the shotgun, release to fire. The farther the shot, the harder it hits.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Online</h3>
+              <p>Host from <b>Online Match</b> and send your friends the 5-letter code. They join from <b>Online Match</b> too, from anywhere. Bots fill empty slots and take over for anyone who disconnects.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ================= HUD ================= -->
+  <!-- ================= STORE (full screen, DbD-style) ================= -->
+  <div id="store" class="hidden">
+    <div class="st-top">
+      <div class="st-title">Store</div>
+      <nav class="st-tabs" id="st-tabs"><button data-t="characters" class="on">Characters</button><button data-t="collections">Collections</button></nav>
+      <div class="st-wallet" id="st-wallet"></div>
+      <button class="st-close" id="st-close" title="Back (Esc)">Back</button>
+    </div>
+    <div class="st-body" id="st-body"></div>
+  </div>
+
+  <!-- ================= ANNOUNCEMENT ================= -->
+  <div id="trailer" class="hidden"></div>
+  <div id="announce" class="hidden"></div>
+
+  <div id="hud" class="hidden">
+    <div id="glare"></div>
+    <div id="fx-vignette"></div><div id="fx-red"></div><div id="fx-frost"></div><div id="fx-tele"></div><div id="splat"></div>
+    <div id="objective"></div>
+    <div id="feed"></div>
+    <div id="team"></div>
+    <div id="markers"></div>
+    <div id="crosshair" class="hidden"><svg viewBox="0 0 40 40"><circle class="cr-bg" cx="20" cy="20" r="14"/><circle class="cr-fill" id="cr-fill" cx="20" cy="20" r="14"/><circle class="cr-dot" cx="20" cy="20" r="2"/></svg></div>
+    <div id="center-bottom">
+      <div id="status"></div>
+      <div id="progress" class="hidden"><div id="progress-label"></div><div class="pb"><div id="progress-fill"></div></div></div>
+      <div id="prompt"></div>
+    </div>
+    <div id="bottom-right"><div id="power"></div><div id="item" class="hidden"></div><div id="perks"></div></div>
+    <div id="controls-hint"></div>
+    <div id="netstat" class="netstat hidden"></div>
+    <div id="fps" class="hidden"></div>
+  </div>
+  <canvas id="skill" width="200" height="200" class="hidden"></canvas>
+  <div id="scoreboard" class="hidden"></div>
+
+  <div id="pause" class="overlay hidden">
+    <div class="dialog">
+      <h2>Paused</h2>
+      <p class="hint">Online matches keep running while you're paused.</p>
+      <div class="field"><label>Mouse sensitivity</label><input type="range" id="pause-sens" min="0.2" max="3" step="0.05"></div>
+      <div class="field"><label>Master volume</label><input type="range" id="pause-vol" min="0" max="1" step="0.01"></div>
+      <div class="field cam-block"><label>Camera position <span class="hint-inline">(third person: the Swap camera shoulder key flips sides in a match)</span></label>
+            <div class="seg" data-cam="side"><button data-v="-1">Left shoulder</button><button data-v="0">Centered</button><button data-v="1">Right shoulder</button></div></div>
+          <div class="field"><label>Camera distance <b data-camv="dist"></b></label><input type="range" data-cam="dist" min="0.6" max="1.6" step="0.05"></div>
+          <div class="field"><label>Camera height <b data-camv="height"></b></label><input type="range" data-cam="height" min="-0.5" max="0.8" step="0.05"></div>
+          <div class="field"><label>Camera angle <b data-camv="angle"></b></label><input type="range" data-cam="angle" min="-60" max="60" step="5"></div>
+          <button class="btn small" data-cam="reset">Reset camera</button>
+      <div class="actions"><button class="btn" id="btn-quit">Leave Match</button><button class="btn primary" id="btn-resume">Resume</button></div>
+    </div>
+  </div>
+
+  <div id="results" class="overlay hidden">
+    <div class="dialog wide results">
+      <h2 id="results-title"></h2>
+      <div id="results-list"></div>
+      <div class="actions" id="results-actions"></div>
+    </div>
+  </div>
+
+  <div id="loading" class="overlay hidden"></div>
+  <div id="toast"></div>
+  <div id="invite-card" class="hidden"></div>
+
+  <script>
+    // If the module scripts never start (file:// or a very old browser), explain what to do.
+    // Checked only once the whole page has arrived: a slow download is not a failure.
+    window.addEventListener('error', function (ev) { window.__nbErr = ev.message; });
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        if (window.__nbBooted) return;
+        var e = document.getElementById('boot-error'); if (e) e.className = '';
+        var l = document.getElementById('boot-loading'); if (l) l.style.display = 'none';
+        if (window.__nbErr) { var d = document.getElementById('boot-detail'); if (d) d.textContent = 'Error: ' + window.__nbErr; }
+      }, 4000);
+    });
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
