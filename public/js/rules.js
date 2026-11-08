@@ -57,6 +57,7 @@ export function speedOf(p, S, sprint, crouch) {
     if (p.slimed > 0) s *= 0.7;
     if (p.card > 0) s *= 0.8; // intimidated by a business card
     if (p.webbed > 0) s *= 0.65; // caught in Spider Mom's web
+    if (p.cursed > 0) s *= KILLERS.slendrina.ability2.slow; // looking at Slendrina
     return S && modeOf(S) === 'adrenaline' ? s * 1.3 : s;
   }
   const K = KILLERS[p.char];
@@ -74,6 +75,8 @@ export function speedOf(p, S, sprint, crouch) {
   if (p.char === 'granny' && p.ab === 1) return 0; // listening
   if (p.char === 'granny' && p.dash) return 0; // (the rush moves her itself)
   if (p.char === 'granny' && p.aim) s *= 0.55;  // winding up the bat
+  if (p.char === 'grandpa' && p.aim) s *= 0.6;  // the shotgun raised to his shoulder
+  if (p.char === 'slendrina' && p.aim) s *= 0.75; // choosing where to Haunt to
   if ((p.char === 'harrower' || p.char === 'foreman' || p.char === 'bateman') && p.aim) s *= p.char === 'foreman' ? 0.75 : p.char === 'bateman' ? 0.6 : SPEED.aimSlow;
   if (p.diffMul) s *= p.diffMul;
   return S && modeOf(S) === 'adrenaline' ? s * 1.3 : s;

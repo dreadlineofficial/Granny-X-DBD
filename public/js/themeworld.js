@@ -15,6 +15,9 @@ export const LOOK = {
     ground: [0x4a3a28, 0x5a4630, 0x2a2828, 0x3a2c20, 0x5a4a30, 0x2a221a], groundTex: 'ground2', ruins: false, trees: 'dead', bushes: 0.35, bush: 0x3a3420, grass: 0.35, grassTint: 0x8a8050, lamp: 0xffd080, groundFog: 0x8a6a8a, groundFogK: 1.2 },
   granny: { fog: 0x161a1e, density: 1.15, hemi: [0x5a6470, 0x2a2018, 1.6], amb: 0x2a3038, moon: [0xc0cce0, 2.4], sky: [0x030407, 0x0c1118], moonDisc: 0xeef2ff, halo: 0x8a9ab8,
     ground: [0x343c26, 0x4a5232, 0x4e3e2c, 0x30261a, 0x3e3222, 0x262418], groundTex: 'ground2', ruins: false, trees: 'dead', bushes: 0.5, bush: 0x262e1c, grass: 0.8, grassTint: 0x8a9060, lamp: 0xffa850, groundFog: 0x5a6470, groundFogK: 1.4 },
+  // Granny's Old House: misty pine woods round the Granny 1 house
+  granny1: { fog: 0x181c20, density: 1.2, hemi: [0x5a6472, 0x2a2218, 1.65], amb: 0x2a3038, moon: [0xc4d0e6, 2.5], sky: [0x030407, 0x0c1118], moonDisc: 0xeef2ff, halo: 0x8a9ab8,
+    ground: [0x34402a, 0x4a5434, 0x523f2c, 0x30261a, 0x403424, 0x262418], groundTex: 'ground2', ruins: true, trees: 'pine', bushes: 0.9, bush: 0x26301e, grass: 0.9, grassTint: 0x8a9462, lamp: 0xffa850, groundFog: 0x5e6874, groundFogK: 1.6 },
   snow: { fog: 0x222c3a, density: 0.95, hemi: [0x8aa0c4, 0x2a3240, 1.45], amb: 0x2e3648, moon: [0xc8d8f4, 2.3], sky: [0x03060e, 0x0e1a30], moonDisc: 0xf4f8ff, halo: 0xa8c0e8,
     ground: [0xc8d2e0, 0xdde4f0, 0x9aa2ae, 0xb0bac8, 0xc0c8d4, 0x9aa4b4], groundTex: 'snow', ruins: false, snowcaps: true, trees: 'snowpine', bushes: 0.4, bush: 0xb8c4d0, grass: 0, grassTint: 0x8a8a70, lamp: 0xffc070, groundFog: 0xc8d8f0, groundFogK: 1.6, particles: 'snow' },
 };

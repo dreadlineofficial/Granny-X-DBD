@@ -143,6 +143,27 @@ export const KILLERS = {
     feature: { name: 'Sharp Ears & Spider Mom', desc: 'She hears everything: survivors who run within 22m of her are revealed, and a failed skill check is heard anywhere. Spider Mom crawls between the generators; anyone she finds repairing is shown to Granny and webbed (slowed for 3s).' },
     color: 0xd8d0c0,
   },
+  // Granny x DBD 1.1: Grandpa takes his own shift, and Slendrina comes up from the cellar
+  grandpa: {
+    id: 'grandpa', name: 'Grandpa', speed: 4.55, terror: 30, weapon: 'Shotgun', crossover: 'Granny (fan-made)',
+    lore: '',
+    exec: { name: 'Last Round', desc: 'Pins the survivor to the floor with his boot and takes his time reloading.' },
+    // survivors carry a second health bar against him (100): the farther the shot, the more it takes
+    shotgun: { name: 'Shotgun', cooldown: 2.0, raise: 0.3, range: 45, minDmg: 25, maxDmg: 60, near: 2, far: 16, reveal: 5 },
+    ability: { name: 'Shotgun', cooldown: 2.0, desc: 'Hold RMB to raise the shotgun (slowed), release to fire. Survivors carry a second health bar against him: two long-range shots put anyone down, up close it takes four. Everyone he hits is revealed for 5s.' },
+    ability2: { name: 'Bear Trap', key: 'R', cooldown: 5, max: 3, snare: 4, reveal: 6, seen: 5, desc: 'Set a bear trap where you stand (up to 3: setting a 4th removes the oldest). A survivor who steps in is injured, caught for 4s and revealed for 6s. Survivors only spot a trap from 5m away.' },
+    feature: { name: 'Old Soldier', desc: 'He takes his time, and he never misses twice: his shots hit hardest from far away, and his traps guard the generators he cannot watch.' },
+    color: 0x8a7a5a,
+  },
+  slendrina: {
+    id: 'slendrina', name: 'Slendrina', speed: 4.6, terror: 24, weapon: 'Claws', crossover: 'Granny (fan-made)', tpv: true, float: true,
+    lore: '',
+    exec: { name: 'Look at Me', desc: 'Lifts the survivor off the ground and makes them look into her eyes until there is nothing left.' },
+    ability: { name: 'Haunt', cooldown: 10, range: 16, time: 0.5, desc: 'Hold RMB to choose a spot up to 16m away, through walls if you like; release to vanish and reappear there half a second later.' },
+    ability2: { name: 'Cursed Gaze', key: 'R', cooldown: 30, duration: 8, range: 26, need: 1.2, slow: 0.8, desc: 'For 8s, every survivor who looks at her is Cursed: their vision darkens, they slow down by 20% and they are revealed. Look at her for more than a second and the curse is complete: her next hit puts them straight down.' },
+    feature: { name: 'Ghost', desc: 'She floats: silent, with a 24m terror radius. Played over the shoulder.' },
+    color: 0x9aa6a0,
+  },
   bateman: {
     id: 'bateman', name: 'Patrick Bateman', speed: 4.7, terror: 28, weapon: 'Axe', crossover: 'American Psycho (fan-made)',
     lore: '',
@@ -307,8 +328,15 @@ export const SKINS = {
   granny: [
     { id: 'default', name: 'House Dress', price: 0, desc: 'Her grey nightgown, her bloody bat, and the stare. You know the one.' },
     { id: 'bloodbath', name: 'Spring Cleaning', price: 3000, tint: 0x8a1010, tintK: 0.35, desc: 'She has been busy. Most of the red is not hers.' },
-    { id: 'grandpa', name: 'Grandpa', price: 0, god: true, grandpa: true, desc: 'GOD TIER: changes how you play. Her husband takes the shift with his shotgun: hold RMB to raise it, release to fire (replaces Bat Rush). Survivors get a second health bar against him: three long-range shots put anyone down, but up close the spread barely scratches them. The farther the shot, the harder it hits.' },
     { id: 'ghost', name: 'Pale Visitor', price: 4500, tint: 0xd8e4f0, tintK: 0.5, glow: 0x6a8aa8, glowK: 0.35, desc: 'Drained of colour, glowing faintly, like something that stayed in the house long after it should have left.' },
+  ],
+  grandpa: [
+    { id: 'default', name: 'Night Watch', price: 0, grandpa: true, desc: 'Braces, a dirty vest, his old shotgun and a bad mood.' },
+    { id: 'bloodbath', name: 'Hunting Season', price: 0, grandpa: true, tint: 0x8a1010, tintK: 0.3, desc: 'Back from a long night in the woods. Not all of it is deer.' },
+  ],
+  slendrina: [
+    { id: 'default', name: 'The Cellar', price: 0, desc: 'Her torn white dress, her long black hair, and those eyes.' },
+    { id: 'pale', name: 'Pale Lady', price: 0, tint: 0xd8e4f0, tintK: 0.45, glow: 0x6a8aa8, glowK: 0.3, desc: 'Even paler, glowing faintly in the dark.' },
   ],
   bateman: [
     { id: 'default', name: 'Pierce & Pierce', price: 0, desc: 'Charcoal pinstripe double-breasted suit, crisp white shirt, red silk tie and a cigar. Valentino Couture.' },
@@ -334,13 +362,24 @@ export const skinOf = (char, id) => (SKINS[char] || []).find(s => s.id === id) |
 // ---------------- Inbox: version notes & gifts ----------------
 // email updates: the Buttondown newsletter's username (empty: the option stays hidden)
 export const NEWSLETTER = '';
-// Granny x DBD: one killer (Granny, or Grandpa as an outfit) and the four original survivors
-export const PLAY_K = ['granny'], PLAY_S = ['mara', 'eli', 'june', 'tomas'];
+// Granny x DBD: three killers (Granny, Grandpa, Slendrina) and the four original survivors
+export const PLAY_K = ['granny', 'grandpa', 'slendrina'], PLAY_S = ['mara', 'eli', 'june', 'tomas'];
 export const playable = c => PLAY_K.includes(c) || PLAY_S.includes(c);
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 // Inbox entries with `email: true` are big updates: they are emailed to newsletter subscribers
 // automatically (tools/email-updates.mjs). Small tweaks leave it out and are never mailed.
 export const INBOX = [
+  {
+    id: 'gdbd11', version: '1.1.0', date: 'Nov 2026', title: 'Grandpa, Slendrina and a new map', tag: 'Update',
+    gift: { embers: 1500, label: 'Update gift: 1,500 Embers' },
+    body: [
+      'Grandpa is his own killer now: a stronger shotgun (two long-range shots put anyone down) and bear traps.',
+      'New killer: Slendrina. Haunt (vanish and reappear up to 16m away, through walls) and Cursed Gaze (look at her and pay for it).',
+      "New map: Granny's Old House. Her first house, out in the woods.",
+      'Smarter bots: they no longer stand around stuck at generators, chests, hooks or pallets.',
+      'Windows app: one file that just runs, and it recovers by itself if the graphics driver crashes.',
+    ],
+  },
   {
     id: 'gdbd1', version: '1.0.0', date: 'Nov 2026', title: 'Welcome to Granny x DBD', tag: 'Launch',
     gift: { embers: 1000, label: 'Welcome gift: 1,000 Embers' },

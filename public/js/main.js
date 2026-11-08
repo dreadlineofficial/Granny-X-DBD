@@ -16,7 +16,7 @@ import { loadRealism, realismReady } from './realism.js';
 import { loadSlappy, slappyReady } from './slappyGlb.js';
 import { loadStatic } from './glbModels.js';
 import { loadScene, sceneReady } from './sceneGlb.js';
-import { loadGranny, grannyReady, onGrannyReady, loadGrandpa, loadSpiderMom } from './grannyGlb.js';
+import { loadGranny, grannyReady, onGrannyReady, loadGrandpa, loadSpiderMom, loadSlendrina, slendrinaReady, grandpaReady } from './grannyGlb.js';
 import { SnapWriter, SnapReader, Track } from './snap.js';
 import { MAP_NAMES, BIG_MAPS, REGULAR_MAPS } from './themes.js';
 import { icon, POWER_ICON } from './icons.js';
@@ -146,18 +146,19 @@ function startBG() {
 }
 // Granny x DBD only needs Granny, Grandpa, Spider Mom, her house and the survivors' items
 loadStatic('beartrap'); loadStatic('taser');
-loadScene('granny_map');
+loadScene('granny_map'); loadScene('granny1_map');
 loadGranny().then(m => { if (m) { forgetArt('granny'); if (menu && menu.killerChar === 'granny') menu.setKiller('granny', menu.killerSkin); } });
-loadGrandpa().then(m => { if (m) forgetArt('granny'); });
+loadGrandpa().then(m => { if (m) { forgetArt('grandpa'); if (menu && menu.killerChar === 'grandpa') menu.setKiller('grandpa', menu.killerSkin); } });
+loadSlendrina().then(m => { if (m) { forgetArt('slendrina'); if (menu && menu.killerChar === 'slendrina') menu.setKiller('slendrina', menu.killerSkin); } });
 // a match with Chucky in it waits (on the loading screen) for his real model, up to 20s
 const spiderOk = () => !!window.__nbSpiderLoaded;
 loadSpiderMom().then(m => { window.__nbSpiderLoaded = !!m; });
 async function waitForModels(need) {
   if (need && need.spider && !realismReady('spiderman')) { loading(true, 'Spider-Man is swinging in…'); await Promise.race([loadRealism('spiderman'), new Promise(r => setTimeout(r, 25000))]); }
   // the Granny's House scenery (a big model) must be in before any match can use the map
-  if (!sceneReady('granny_map')) { loading(true, 'Unlocking Granny\'s front door…'); await Promise.race([loadScene('granny_map'), new Promise(r => setTimeout(r, 25000))]); }
+  if (!sceneReady('granny_map') || !sceneReady('granny1_map')) { loading(true, 'Unlocking Granny\'s front door…'); await Promise.race([Promise.all([loadScene('granny_map'), loadScene('granny1_map')]), new Promise(r => setTimeout(r, 25000))]); }
   // Granny and her granddaughter, when she's in the match
-  if (need === 'granny' || (need && need.granny)) { if (!grannyReady() || !spiderOk()) { loading(true, 'Granny is coming down the stairs…'); await Promise.race([Promise.all([loadGranny(), loadGrandpa(), loadSpiderMom()]), new Promise(r => setTimeout(r, 25000))]); } }
+  if (need === 'granny' || (need && need.granny)) { if (!grannyReady() || !spiderOk() || !grandpaReady() || !slendrinaReady()) { loading(true, 'Granny is coming down the stairs…'); await Promise.race([Promise.all([loadGranny(), loadGrandpa(), loadSpiderMom(), loadSlendrina()]), new Promise(r => setTimeout(r, 25000))]); } }
   if (need && need.granny) need = need.chucky;
   if (!need || (chuckyReady() && slappyReady())) return;
   loading(true, "Waking Chucky up…");
@@ -683,7 +684,8 @@ function botSurvivor(i, used) {
   return { id: 'bot' + i, name: nm + ' (bot)', role: 'survivor', char, skin, perks: randomPerks(SURV_PERKS, PERK_SLOTS, char), item, pet: '', bot: true };
 }
 function botKiller(char, n = 0, avoid = []) {
-  const c = 'granny';
+  const pool = PLAY_K.filter(k => !avoid.includes(k));
+  const c = PLAY_K.includes(char) ? char : (pool.length ? pool : PLAY_K)[Math.floor(Math.random() * (pool.length || PLAY_K.length))];
   // a killer you picked keeps their usual look; random bots may wear an outfit, but never a god-tier one
   // (Grandpa is a whole different character)
   const picked = char && char !== 'random' && c === char, outfits = SKINS[c].slice(1).filter(k => !k.god);
@@ -704,7 +706,7 @@ function renderTest() {
   $('test-item-row').classList.toggle('hidden', role !== 'survivor'); $('test-item').value = T.item;
   $('test-opp-row').classList.toggle('hidden', role !== 'survivor'); $('test-surv-row').classList.toggle('hidden', role !== 'killer');
   $('test-opp').innerHTML = Object.values(KILLERS).filter(d => playable(d.id)).map(d => `<option value="${d.id}" ${d.id === T.opp ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
-  $('test-map').innerHTML = ['granny'].map(m => `<option value="${m}" ${m === T.map ? 'selected' : ''}>${m === 'random' ? 'Random' : esc(MAP_NAMES[m])}</option>`).join('');
+  $('test-map').innerHTML = REGULAR_MAPS.map(m => `<option value="${m}" ${m === T.map ? 'selected' : ''}>${m === 'random' ? 'Random' : esc(MAP_NAMES[m])}</option>`).join('');
   $('test-gm').innerHTML = Object.entries(MODES).map(([id, m]) => `<option value="${id}" ${id === T.gm ? 'selected' : ''}>${m.name} (${m.short})</option>`).join('');
   const L = role === 'killer' && POWER_LV[c];
   $('test-reach-row').classList.toggle('hidden', !L);
@@ -816,7 +818,7 @@ let session = null;
 
 const MAPS = MAP_NAMES;
 // Infection is played on its own big maps; the other modes on the regular ones (unless picked by name)
-function resolveMap() { return 'granny'; }
+function resolveMap(m) { return REGULAR_MAPS.includes(m) ? m : REGULAR_MAPS[Math.floor(Math.random() * REGULAR_MAPS.length)]; }
 
 class HostSession {
   constructor(roster, opts) {
@@ -937,7 +939,7 @@ class HostSession {
 
 class ClientSession {
   get tickWhileLoading() { return !this.game; }
-  constructor(net, start, myId) { this.net = net; this.myId = myId; this.isHost = false; this.M = buildMap(start.seed); this.S = null; this.game = null; this.queued = []; this.reader = new SnapReader(); }
+  constructor(net, start, myId) { this.net = net; this.myId = myId; this.isHost = false; this.M = buildMap(start.seed, start.map); this.S = null; this.game = null; this.queued = []; this.reader = new SnapReader(); }
   onMsg(m) {
     if (m.t === 's') { const s = this.reader.read(m.s); if (s) this.S = s; }
     // events arrive separately (reliably); they still count before the first keyframe
@@ -973,7 +975,7 @@ async function startHostMatch(roster, opts) {
   loading(true, 'Entering the fog…');
   await nextFrame();
   // Chucky can appear in any match (picked, random bot killer, or an Infection turn)
-  await waitForModels({ spider: roster.some(r => r.char === 'spiderman'), granny: roster.some(r => r.char === 'granny') || opts.mode === 'infection', chucky: roster.some(r => r.char === 'chucky') || opts.mode === 'infection' });
+  await waitForModels({ spider: roster.some(r => r.char === 'spiderman'), granny: true, chucky: roster.some(r => r.char === 'chucky') || opts.mode === 'infection' });
   loading(true, 'Entering the fog…');
   stopBG();
   $('menu').classList.add('hidden');
@@ -1209,7 +1211,7 @@ setInterval(() => {
 async function startClientMatch(m) {
   loading(true, 'Entering the fog…');
   await nextFrame();
-  await waitForModels({ spider: (m.roster || []).some(r => r.char === 'spiderman'), granny: (m.roster || []).some(r => r.char === 'granny') || m.mode === 'infection', chucky: (m.roster || []).some(r => r.char === 'chucky') || m.mode === 'infection' });
+  await waitForModels({ spider: (m.roster || []).some(r => r.char === 'spiderman'), granny: true, chucky: (m.roster || []).some(r => r.char === 'chucky') || m.mode === 'infection' });
   loading(true, 'Entering the fog…');
   stopBG();
   $('menu').classList.add('hidden');
@@ -1256,7 +1258,7 @@ function renderLobby() {
   }
 }
 const playableSurvivor = () => ownsChar(profile.survivor.char) ? profile.survivor.char : 'mara';
-const playableKiller = () => 'granny';
+const playableKiller = () => PLAY_K.includes(profile.killer.char) ? profile.killer.char : 'granny';
 function myLoadouts() { return { survivor: { ...profile.survivor, char: playableSurvivor(), skin: skinId(playableSurvivor()), pet: petOf('survivor') }, killer: { ...profile.killer, char: playableKiller(), skin: skinId(playableKiller()), pet: petOf('killer'), ...killerExtras(playableKiller()) } }; }
 function sendMyLoadout(role) {
   const me = myLobbyPlayer();
@@ -1521,10 +1523,10 @@ const AN_GRANNY = `<div class="an-bg granny"></div><div class="an-inner">
   <div class="an-kicker">Fan-made · What it could look like</div>
   <div class="an-banner"><div class="an-img granny-art"></div><div class="an-scan"></div></div>
   <div class="an-x">× <span>DBD</span></div>
-  <p class="an-sub">You wake up in her house. Four survivors, seven generators, two exit gates and one Granny. She hears every creak of the floorboards, appears at any generator or hook she likes, <b>Spider Mom</b> crawls the generators looking for you, and Granny can switch bodies with her in an instant. Or Grandpa takes the shift with his shotgun.</p>
-  <ul class="an-list"><li>Killer: <b>Granny</b> (Bat Rush, I Hear You, Creep, Body Swap)</li><li>Outfit: <b>Grandpa</b> and his shotgun (free)</li><li>Survivors: <b>Mara, Eli, June, Tomás</b></li><li>Map: <b>Granny's House</b> · bots or online with friends</li></ul>
+  <p class="an-sub">You wake up in her house. Four survivors, seven generators, two exit gates and one Granny. She hears every creak of the floorboards, appears at any generator or hook she likes, <b>Spider Mom</b> crawls the generators looking for you, and Granny can switch bodies with her in an instant. Grandpa takes the shift with his shotgun, and Slendrina comes up from the cellar.</p>
+  <ul class="an-list"><li>Killers: <b>Granny</b> (Bat Rush, I Hear You, Creep, Body Swap), <b>Grandpa</b> (Shotgun, Bear Traps), <b>Slendrina</b> (Haunt, Cursed Gaze)</li><li>Survivors: <b>Mara, Eli, June, Tomás</b></li><li>Maps: <b>Granny's House</b>, <b>Granny's Old House</b> · bots or online with friends</li></ul>
   <div class="an-actions"><button class="btn primary big" id="an-play">Play as Survivor</button><button class="btn big" id="an-store">Play as Granny</button><button class="btn" id="an-trailer">Watch Trailer</button><button class="btn" id="an-close">Close</button></div>
-  <p class="gb-note">Fan-made. Granny, Grandpa and Spider Mom are characters by DVloper; Dead by Daylight is by Behaviour Interactive. Not affiliated with or endorsed by either.</p></div>`;
+  <p class="gb-note">Fan-made. Granny, Grandpa, Slendrina and Spider Mom are characters by DVloper; Dead by Daylight is by Behaviour Interactive. Not affiliated with or endorsed by either.</p></div>`;
 function showAnnounce(kind = 'offal') {
   closePanel();
   const A = $('announce'); A.innerHTML = kind === 'gb' ? AN_GB : kind === 'granny' ? AN_GRANNY : AN_OFFAL; A.classList.remove('hidden');

@@ -1,6 +1,6 @@
 // Authoritative game simulation. Runs only on the host (or in single-player).
 import { RULES, KILLERS, SURVIVORS, POSSESS_MAX, POWER_LV, powerReach, SPEED, DIFFICULTY, HALF, MODES, INFECT_POOL, SURV_PERKS, PERK_SLOTS, ITEMS } from './config.js';
-import { barBox, losBlocked, moveCircle, findPath, cellOf, cellPos, levelOf, levelsMeet, losL, heightAt, levelStep } from './map.js';
+import { barBox, losBlocked, moveCircle, findPath, cellOf, cellPos, levelOf, levelsMeet, losL, heightAt, levelStep, overlaps } from './map.js';
 import {
   has, fwd, dist, killerOf, killersOf, nearestKiller, anyKillerHas, playerById, findInteraction, actionTime, terrorRadius, inExit, findSpace, vaultDuration, findExecute, angDiff,
 } from './rules.js';
@@ -73,7 +73,7 @@ export class Sim {
         item: mode === 'bloodmoon' && r.role === 'survivor' ? 'taser' : 'flashlight', flash: r.role === 'survivor' && mode !== 'bloodmoon' ? RULES.flashBattery * (mode === 'dark' ? 0.5 : 1) : 0, traps: false ? (r.char === 'raghuvir' || r.char === 'abeer' ? 3 : 2) + ((r.perks || []).includes('containment') ? 1 : 0) : 0, flashOn: false, glare: 0, blind: 0, blindImm: 0, tasers: mode === 'bloodmoon' && r.role === 'survivor' ? 2 : 0, zap: 0, spied: 0, fl: 0, sp: 0, reach: r.role === 'killer' && POWER_LV[r.char] ? (r.char === 'granny' && r.og ? 999 : powerReach(r.char, r.lv)) : 0, og: r.char === 'granny' && !!r.og, heard: 0, webbed: 0, webs: r.role === 'survivor' && r.char === 'spiderman' ? SURVIVORS.spiderman.web.shots : 0, webK: 0, dash: null, swapCd: 0,
         score: { a: 0, b: 0, c: 0, d: 0 }, outcome: '', diffMul: r.role === 'killer' && r.bot ? this.diff.killerSpeed : 1,
         possCd: 0, disguise: false, harmless: false, pdowns: 0, pcages: 0, noCage: false, split: false,
-        pet: '',
+        pet: '', gaze: 0, curse: 0, cursed: 0, doomed: 0,
       });
     }
   }
@@ -117,6 +117,8 @@ export class Sim {
         if (p.role === 'killer' && p.char === 'harrower') p.aim = !!m.aim && p.abCd <= 0 && p.ammo > 0 && p.carry == null && !p.act && p.stun <= 0;
         if (p.role === 'killer' && p.char === 'bateman') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && p.ammo > 0 && p.carry == null && !p.act && p.stun <= 0 && !p.atk; if (p.aim && !was) p.abT = 0; }
         if (p.role === 'killer' && p.char === 'granny') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && !p.dash && p.carry == null && !p.act && p.stun <= 0 && !p.atk && !p.tele && p.ab !== 1; if (p.aim && !was) p.abT = 0; }
+        if (p.role === 'killer' && p.char === 'grandpa') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && p.carry == null && !p.act && p.stun <= 0 && !p.atk && !p.tele; if (p.aim && !was) p.abT = 0; }
+        if (p.role === 'killer' && p.char === 'slendrina') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && p.carry == null && !p.act && p.stun <= 0 && !p.atk && !p.tele && (p.fl || 0) < 10; if (p.aim && !was) p.abT = 0; }
         if (p.role === 'killer' && p.char === 'chucky') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && !p.leap && p.carry == null && !p.act && p.stun <= 0 && !p.atk; if (p.aim && !was) p.abT = 0; }
         break;
       }
@@ -367,7 +369,7 @@ export class Sim {
         break;
       }
       case 'rush': {
-        if (p.role === 'killer' && p.char === 'granny' && p.skin === 'grandpa') { this.shotgun(p, m); break; }
+        if (p.role === 'killer' && p.char === 'grandpa') { this.shotgun(p, m); break; }
         // Bat Rush: released after winding up; the longer the wind-up, the further she goes (no limit)
         if (p.role !== 'killer' || p.char !== 'granny' || !p.aim || p.dash || p.stun > 0 || p.act || p.carry != null) { if (p.char === 'granny') p.aim = false; return; }
         const D = KILLERS.granny.ability, k = Math.max(0, Math.min(1, (p.abT - D.minCharge) / (D.maxCharge - D.minCharge)));
@@ -378,6 +380,21 @@ export class Sim {
         p.yaw = yaw; p.dash = { t: 0, d: len / D.speed, dx: f.x, dz: f.z, full: p.abT >= D.maxCharge - 0.02 };
         p.abCd = D.cooldown; p.abT = 0;
         this.ev({ k: 'rush', id: p.id, x: p.x, z: p.z, charge: +k.toFixed(2) });
+        break;
+      }
+      case 'haunt': {
+        // Slendrina: vanish, and reappear where she pointed (through walls), on the floor she is on
+        const D = KILLERS.slendrina.ability, held = p.aim;
+        p.aim = false;
+        if (p.role !== 'killer' || p.char !== 'slendrina' || !held || p.abCd > 0 || p.tele || p.stun > 0 || p.act || p.carry != null || p.atk || p.vault || (p.fl || 0) >= 10) return;
+        let tx = num(m.x, p.x), tz = num(m.z, p.z);
+        const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
+        if (d > D.range) { tx = p.x + dx / d * D.range; tz = p.z + dz / d * D.range; }
+        if (d < 1.5) return;
+        const L = levelOf(M, p.fl), spot = this.reachableSpot(L, tx, tz, p);
+        if (!spot) { this.ev({ k: 'hauntfail', id: p.id }); return; }
+        p.tele = { t: 0, x: spot.x, z: spot.z, h: 1 }; p.abCd = D.cooldown;
+        this.ev({ k: 'haunt', id: p.id, x: p.x, z: p.z, tx: spot.x, tz: spot.z });
         break;
       }
       case 'bodyswap': {
@@ -413,6 +430,21 @@ export class Sim {
         break;
       }
       case 'ability2': {
+        if (p.role === 'killer' && p.char === 'grandpa' && p.ab2Cd <= 0 && !p.act && p.stun <= 0 && !p.atk && p.carry == null && !p.aim && !p.vault && (p.fl || 0) < 10) {
+          // Bear Trap: set where he stands (not on a window, pallet, hook or generator)
+          const D = KILLERS.grandpa.ability2, mine = S.bears.filter(b => b.by === p.id);
+          const f = fwd(p.yaw), spot = this.safeSpot(p.x + f.x * 0.6, p.z + f.z * 0.6, p.x, p.z, p.fl || 0);
+          const clash = [...M.gens, ...M.cages, ...M.windows, ...M.bars].some(o => Math.hypot(o.x - spot.x, o.z - spot.z) < 1.6) || S.bears.some(b => Math.hypot(b.x - spot.x, b.z - spot.z) < 2);
+          if (clash) { this.ev({ k: 'bearfail', id: p.id }); break; }
+          if (mine.length >= D.max) { const old = mine[0]; S.bears = S.bears.filter(b => b !== old); }
+          S.bears.push({ id: ++S.lid, x: +spot.x.toFixed(2), z: +spot.z.toFixed(2), fl: p.fl || 0, by: p.id });
+          p.ab2Cd = D.cooldown;
+          this.ev({ k: 'bearset', id: p.id, x: spot.x, z: spot.z });
+        }
+        if (p.role === 'killer' && p.char === 'slendrina' && p.ab2Cd <= 0 && !(p.gaze > 0) && !p.act && p.stun <= 0) {
+          p.gaze = KILLERS.slendrina.ability2.duration;
+          this.ev({ k: 'gaze', id: p.id, x: p.x, z: p.z, on: true });
+        }
         if (p.role === 'killer' && p.char === 'granny' && p.ab2Cd <= 0 && !p.ab && !p.tele && !p.act && p.stun <= 0 && !p.atk && p.carry == null) {
           // I Hear You: she stops and listens; anyone making noise anywhere is revealed
           const D = KILLERS.granny.ability2, ids = [];
@@ -662,6 +694,8 @@ export class Sim {
     this.updateSpears(dt);
     this.updateSaws(dt);
     this.updateGranny(dt);
+    this.updateGrandpa(dt);
+    this.updateSlendrina(dt);
 
     // ---- survivor states ----
     for (const p of S.players) {
@@ -967,6 +1001,7 @@ export class Sim {
     // (slimed survivors are slowed and revealed, not one-shot: that made him unbeatable) // one strike from the hook, in the dark
     s.act = null; s.prog = 0;
     if (K && K.char === 'granny' && s.heard > 0) { instantDown = true; s.heard = 0; }
+    if (K && K.char === 'slendrina' && s.doomed > 0) { instantDown = true; s.doomed = 0; s.curse = 0; }
     if (this.mode === 'glass') instantDown = true; // Glass Bones: every hit downs
     if (K && K.disguise) (s.knows ||= {})[K.id] = true; // hit by the 'survivor' Chucky is wearing: now they know // I Hear You: she knew exactly where you were
     const wasHp = s.hp;
@@ -1488,10 +1523,78 @@ export class Sim {
       else { K.atk = 2; K.atkHit = false; K.atkT = 0.7; }
     }
   }
-  // Grandpa's shotgun (god-tier outfit): a hitscan blast. Survivors carry a second health bar
-  // against him (shp, 100): the farther the shot, the more it takes, and at 0 they go down.
+  // the nearest open, walkable spot to (x, z) on level L that can be walked to from the rest of the map
+  reachableSpot(L, x, z, from) {
+    const g = L.grid; if (!g) return null;
+    const ok = (k, px, pz) => k >= 0 && g.type[k] === 0 && !overlaps(L, px, pz, 0.45);
+    let best = null;
+    for (let r = 0; r <= 2.5 && !best; r += 0.5) for (let a = 0; a < (r ? 12 : 1) && !best; a++) {
+      const px = x + Math.cos(a / 12 * 6.283) * r, pz = z + Math.sin(a / 12 * 6.283) * r;
+      if (ok(cellOf(L, px, pz), px, pz)) best = { x: px, z: pz };
+    }
+    if (!best) return null;
+    // somewhere sealed off (inside a house's walls, a fenced-off pocket): no
+    if (!findPath(L, best.x, best.z, from.x, from.z, t => t === 1 ? Infinity : 1, 30000)) return null;
+    return best;
+  }
+  // Grandpa: winding up the shotgun; his bear traps
+  updateGrandpa(dt) {
+    const S = this.S, D = KILLERS.grandpa.ability2;
+    for (const K of S.players) if (K.role === 'killer' && K.char === 'grandpa' && K.aim) { K.abT = Math.min(60, K.abT + dt); if (K.stun > 0 || K.carry != null || K.act) K.aim = false; }
+    if (!S.bears.length) return;
+    for (const s of S.players) {
+      if (s.role !== 'survivor' || s.st !== 'ok' || s.vault || s.swing || s.perchT > 0) continue;
+      const b = S.bears.find(b => (b.fl || 0) === (s.fl || 0) && Math.hypot(b.x - s.x, b.z - s.z) < 0.62);
+      if (!b) continue;
+      S.bears = S.bears.filter(x => x !== b);
+      const K = this.P(b.by) || nearestKiller(S, s);
+      s.snare = D.snare; s.reveal = Math.max(s.reveal, D.reveal); s.x = b.x; s.z = b.z; s.tp++;
+      if (K) this.damage(s, K, false);
+      if (s.st === 'ok') { s.boost = 0; s.snare = D.snare; } // (caught: no sprint burst from the bite)
+      this.ev({ k: 'bearsnap', id: s.id, by: b.by, x: b.x, z: b.z });
+      this.ev({ k: 'msg', text: s.name + ' stepped in a bear trap!' });
+    }
+  }
+  // Slendrina: Haunt (vanish, reappear); Cursed Gaze (whoever looks at her pays for it)
+  updateSlendrina(dt) {
+    const S = this.S, M = this.M, A = KILLERS.slendrina.ability, G = KILLERS.slendrina.ability2;
+    for (const s of S.players) if (s.role === 'survivor') {
+      if (s.cursed > 0) s.cursed = Math.max(0, s.cursed - dt);
+      if (s.doomed > 0) { s.doomed = Math.max(0, s.doomed - dt); if (s.st !== 'ok') s.doomed = 0; }
+      if (!(s.cursed > 0) && s.curse > 0) s.curse = Math.max(0, s.curse - dt * 0.5);
+    }
+    for (const K of S.players) {
+      if (K.role !== 'killer' || K.char !== 'slendrina') continue;
+      if (K.aim) { K.abT = Math.min(60, K.abT + dt); if (K.stun > 0 || K.carry != null || K.act) K.aim = false; }
+      if (K.tele && K.tele.h) {
+        K.tele.t += dt;
+        if (K.stun > 0) K.tele = null;
+        else if (K.tele.t >= A.time) {
+          K.x = K.tele.x; K.z = K.tele.z; K.tp++; K.tele = null;
+          this.ev({ k: 'tele-end', id: K.id, x: K.x, z: K.z, haunt: true });
+        }
+      }
+      if (K.gaze > 0) {
+        K.gaze = Math.max(0, K.gaze - dt);
+        if (K.gaze === 0) { K.ab2Cd = G.cooldown; this.ev({ k: 'gaze', id: K.id, on: false }); }
+        else for (const s of S.players) {
+          if (s.role !== 'survivor' || s.st !== 'ok' || !levelsMeet(K, s)) continue;
+          const dx = K.x - s.x, dz = K.z - s.z, d = Math.hypot(dx, dz);
+          if (d > G.range || d < 0.3) continue;
+          const f = fwd(s.yaw), look = (dx * f.x + dz * f.z) / d;
+          if (look < 0.86 || losL(M, s, K, 1.5)) continue; // (within ~30 degrees of where they look)
+          if (!(s.cursed > 0)) this.ev({ k: 'cursed', id: s.id, by: K.id });
+          s.cursed = 1.2; s.reveal = Math.max(s.reveal, 1.2);
+          s.curse = Math.min(G.need, (s.curse || 0) + dt);
+          if (s.curse >= G.need && !(s.doomed > 0)) { s.doomed = 20; this.ev({ k: 'doomed', id: s.id, by: K.id }); }
+        }
+      }
+    }
+  }
+  // Grandpa's shotgun: a hitscan blast. Survivors carry a second health bar against him (shp, 100):
+  // the farther the shot, the more it takes, and at 0 they go down.
   shotgun(K, m) {
-    const S = this.S, M = this.M, G = KILLERS.granny.shotgun;
+    const S = this.S, M = this.M, G = KILLERS.grandpa.shotgun;
     const raised = K.aim && K.abT >= G.raise;
     K.aim = false; K.abT = 0;
     if (!raised || K.abCd > 0 || K.dash || K.stun > 0 || K.act || K.carry != null || K.tele) return;
@@ -1519,6 +1622,7 @@ export class Sim {
       dmg = Math.round(G.minDmg + (G.maxDmg - G.minDmg) * k);
       best.shp = Math.max(0, (best.shp ?? 100) - dmg);
       best.lastHitBy = K.id; K.score.a += 50 + dmg * 4;
+      best.reveal = Math.max(best.reveal, G.reveal);
       if (best.shp <= 0) { best.shp = 100; this.damage(best, K, true); }
       else { best.boost = 0.8; best.boostMul = SPEED.hitBoost; best.act = null; best.prog = 0; }
     }

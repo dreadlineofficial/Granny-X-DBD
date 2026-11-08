@@ -161,7 +161,9 @@ export class Bots {
   costFn(p) {
     const S = this.sim.S;
     if (p.role === 'killer' && p.char === 'chucky') return (t, r) => t === 1 ? Infinity : t === 2 ? 1.5 : t === 3 ? (S.bars[r] === 1 ? 1.5 : 1) : t === 4 ? Infinity : 1; // jumps them
-    if (p.role === 'killer') return (t, r) => t === 1 ? Infinity : t === 2 ? 5 : t === 3 ? (S.bars[r] === 1 ? 8 : 1) : t === 4 ? Infinity : 1;
+    // (carrying someone, a killer can't break a dropped pallet: go round it)
+    // (one-cell gaps: a survivor squeezes through, the killer is too wide: avoid them when there's another way)
+    if (p.role === 'killer') return (t, r, nw) => (t === 1 ? Infinity : t === 2 ? 5 : t === 3 ? (S.bars[r] === 1 ? (p.carry != null ? Infinity : 8) : 1) : t === 4 ? Infinity : 1) + (nw ? 20 : 0);
     return (t, r) => t === 1 ? Infinity : t === 2 ? 3 : t === 3 ? (S.bars[r] === 1 ? 3.5 : 1) : t === 4 ? (S.gates[r].open ? 1 : Infinity) : 1;
   }
   goTo(p, b, x, z, key, dt, sprint = true, every = 1.2) {
@@ -296,6 +298,11 @@ export class Bots {
       const t = playerById(S, b.target);
       if (t) p.yaw += Math.max(-1.1 * dt, Math.min(1.1 * dt, angDiff(p.yaw, Math.atan2(t.x - p.x, t.z - p.z))));
     }
+    if (p.role === 'survivor' && S.bears && S.bears.length && m > 0.05) {
+      // (running for their life, they often don't look down)
+      for (const t of S.bears) { const dx = p.x - t.x, dz = p.z - t.z, d = Math.hypot(dx, dz); if (sprint && ((t.id * 7 + p.id.charCodeAt(p.id.length - 1)) % 10) < 6) continue; if (d < 1.5 && d > 0.01 && (t.fl || 0) === (p.fl || 0)) { const k = (1.5 - d) / 1.5 * 1.8; mx += dx / d * k; mz += dz / d * k; } }
+      const m2 = Math.hypot(mx, mz); if (m2 > 1) { mx /= m2; mz /= m2; }
+    }
     stepMover(M, S, p, { mx, mz, sprint, crouch: b.crouch }, dt);
     if (p.bump && p.char === 'butcher' && p.ab === 1) this.sim.onMsg(p.id, { t: 'act', a: 'bump' });
     // stuck detection
@@ -328,7 +335,20 @@ export class Bots {
       }
       return;
     }
-    if (p.st !== 'ok') { this.setE(p, b, false); return; }
+    if (p.st !== 'ok') { this.setE(p, b, false); b.wd = null; return; }
+    // watchdog: a survivor that has not moved or done anything for a while gives up on what it was
+    // trying to reach (that generator / chest / teammate) for a bit, steps aside and picks something else
+    {
+      const wd = b.wd ||= { x: p.x, z: p.z, t: 0 };
+      if (p.act || p.vault || p.swing || p.perchT > 0 || p.snare > 0 || p.stun > 0 || Math.hypot(p.x - wd.x, p.z - wd.z) > 0.5) { wd.x = p.x; wd.z = p.z; wd.t = 0; }
+      else wd.t += dt;
+      if (wd.t > 2.5) {
+        wd.t = 0;
+        if (b.mode && b.mode !== 'rescue' && b.mode !== 'exit') (b.avoid ||= {})[b.mode + ':' + b.modeId] = S.t + 15;
+        b.path = null; b.repath = 0; b.side = 0.7; b.sideDir = null; b.goalKey = '';
+      }
+    }
+    const avoid = (mode, id) => !!(b.avoid && b.avoid[mode + ':' + id] > S.t);
 
     // awareness of the killer
     let threat = false, kd = 99;
@@ -395,7 +415,7 @@ export class Bots {
       if ((kFar || (urgent && dist(K, c) > 5)) && !someoneElse) { goal = { mode: 'rescue', modeId: o.id, x: c.x, z: c.z, kind: 'rescue', id: o.cage }; break; }
     }
     // help downed teammates
-    if (!goal) for (const o of others) if (o.st === 'down' && (!K || dist(K, o) > 12) && dist(p, o) < 40) { goal = { mode: 'help', modeId: o.id, x: o.x, z: o.z, kind: 'heal', id: o.id }; break; }
+    if (!goal) for (const o of others) if (o.st === 'down' && (!K || dist(K, o) > 12) && dist(p, o) < 40 && !avoid('help', o.id)) { goal = { mode: 'help', modeId: o.id, x: o.x, z: o.z, kind: 'heal', id: o.id }; break; }
     // snuff cursed lanterns near us when the killer is far
     if (!goal && K && kd > 22) for (const L of S.lanterns || []) {
       if (Math.hypot(L.x - p.x, L.z - p.z) < 9 && Math.random() < 0.7) { goal = { mode: 'snuff', modeId: L.id, x: L.x, z: L.z, kind: 'snuff', id: L.id }; break; }
@@ -412,14 +432,14 @@ export class Bots {
     }
     // heal injured teammates nearby (or get healed)
     if (!goal && (!K || kd > 20)) {
-      for (const o of others) if (o.st === 'ok' && o.hp === 1 && dist(p, o) < 14 && !o.act) { goal = { mode: 'heal', modeId: o.id, x: o.x, z: o.z, kind: 'heal', id: o.id }; break; }
+      for (const o of others) if (o.st === 'ok' && o.hp === 1 && dist(p, o) < 14 && !o.act && !avoid('heal', o.id)) { goal = { mode: 'heal', modeId: o.id, x: o.x, z: o.z, kind: 'heal', id: o.id }; break; }
     }
     // a chest nearby: search it, and take what's in it if it beats what we're holding
     if (!goal && !threat && M.chests && S.chests) {
       const charge = itemCharge(p);
       for (const c of M.chests) {
         const cs = S.chests[c.id], d = Math.hypot(c.x - p.x, c.z - p.z);
-        if (!cs || d > (charge <= 0.3 ? 12 : 6) || (K && Math.hypot(K.x - c.x, K.z - c.z) < 12)) continue; // a quick detour only
+        if (!cs || d > (charge <= 0.3 ? 12 : 6) || (K && Math.hypot(K.x - c.x, K.z - c.z) < 12) || avoid('chest', c.id)) continue; // a quick detour only
         const better = cs.open && cs.it && cs.it.n > 0.05 && ((cs.it.k === 'taser' && p.item !== 'taser') || charge <= 0.05);
         if (!cs.open || better) { goal = { mode: 'chest', modeId: c.id, x: c.x, z: c.z, kind: cs.open ? 'swap' : 'chest', id: c.id }; break; }
       }
@@ -429,7 +449,7 @@ export class Bots {
       let best = -1, bs = -1e9;
       for (const g of M.gens) {
         const gs = S.gens[g.id];
-        if (gs.done) continue;
+        if (gs.done || avoid('repair', g.id)) continue;
         const mates = S.players.filter(o => o !== p && o.role === 'survivor' && o.st === 'ok' && Math.hypot(o.x - g.x, o.z - g.z) < 3).length;
         let score = -Math.hypot(g.x - p.x, g.z - p.z) + gs.p * 30 + (mates === 1 && gs.p > 0.5 ? 6 : 0) - mates * 12 - (gs.reg ? 0 : 0);
         if (K) { const kd2 = Math.hypot(K.x - g.x, K.z - g.z); if (kd2 < 16) score -= (16 - kd2) * 3; }
@@ -457,7 +477,7 @@ export class Bots {
     // sneak when the killer is near-ish
     b.crouch = K && kd < 18 && !threat && goal.mode === 'repair' && Math.random() < 0.002 ? !b.crouch : (K && kd < 14 ? b.crouch : false);
     const gd = Math.hypot(goal.x - p.x, goal.z - p.z);
-    const closeEnough = goal.kind === 'exit' ? false : gd < (goal.kind === 'repair' ? 0.7 : 2.2);
+    const closeEnough = goal.kind === 'exit' ? false : gd < (goal.kind === 'repair' ? 1.6 : 2.2);
     if (closeEnough || (goal.kind !== 'repair' && goal.kind !== 'exit')) {
       const it = findInteraction(M, S, p);
       if (it && it.k === goal.kind && (goal.id === undefined || it.id === goal.id)) {
@@ -466,10 +486,11 @@ export class Bots {
         this.move(p, b, 0, 0, dt, false);
         return;
       }
-      if (closeEnough && (goal.kind === 'heal' || goal.kind === 'rescue')) {
-        const tx = goal.kind === 'rescue' ? M.cages[goal.id].x : goal.x, tz = goal.kind === 'rescue' ? M.cages[goal.id].z : goal.z;
-        this.move(p, b, tx - p.x, tz - p.z, dt, false);
-        return;
+      if (closeEnough && goal.kind !== 'gate') {
+        // (a generator / chest / hook: its centre; the slot beside a generator may be taken)
+        const o = goal.kind === 'rescue' ? M.cages[goal.id] : goal.kind === 'repair' ? M.gens[goal.id] : (goal.kind === 'chest' || goal.kind === 'swap') ? M.chests[goal.id] : goal;
+        const tx = o.x - p.x, tz = o.z - p.z;
+        if (Math.hypot(tx, tz) > 0.3) { p.yaw = Math.atan2(tx, tz); this.move(p, b, tx, tz, dt, false); return; }
       }
     }
     this.setE(p, b, false);
@@ -573,8 +594,23 @@ export class Bots {
     if (p.disguise && p.pdowns >= 1 && p.pcages >= 1 && p.carry == null && !p.act) { sim.onMsg(p.id, { t: 'act', a: 'possess' }); return; }
     if (p.act) {
       // keep holding while the action continues
-      this.move(p, b, 0, 0, dt, false);
+      this.move(p, b, 0, 0, dt, false); b.wd = null;
       return;
+    }
+    {
+      const wd = b.wd ||= { x: p.x, z: p.z, t: 0 };
+      if (b.aim || p.aim || p.tele || p.dash || p.atk || p.ab === 1 || Math.hypot(p.x - wd.x, p.z - wd.z) > 0.5) { wd.x = p.x; wd.z = p.z; wd.t = 0; }
+      else wd.t += dt;
+      if (wd.t > 3) {
+        // stuck chasing someone it can't reach, or patrolling a spot it can't get to: let it go
+        const kav = b.kAvoid ||= {};
+        if (p.carry != null && b.hookGoal != null) kav['hook:' + b.hookGoal] = S.t + 20;
+        if (b.downGoal != null) kav['down:' + b.downGoal] = S.t + 12;
+        wd.t = 0; b.target = null; b.lastSeen = null; b.search = null; b.patrolGen = -1; b.genIdle = 0; b.hookGoal = null; b.downGoal = null;
+        if (b.leaveCage) b.leaveCage.t = 0;
+        b.path = null; b.repath = 0; b.side = 0.8; b.sideDir = null; b.goalKey = '';
+        if (p.carry != null && (b.carryStuck = (b.carryStuck || 0) + 1) >= 3) { b.carryStuck = 0; sim.onMsg(p.id, { t: 'act', a: 'drop-carry' }); }
+      }
     }
     // carrying: go to the nearest free cage
     if (p.carry != null) {
@@ -582,11 +618,12 @@ export class Bots {
       b.target = null;
       let best = null, bd = 1e9;
       // (stick with the hook already chosen unless another is clearly closer: no flip-flopping on ties)
-      for (const c of M.cages) if (S.cages[c.id] == null && !S.cageBroken[c.id]) { const d = Math.hypot(c.x - p.x, c.z - p.z) - (c.id === b.hookGoal ? 4 : 0); if (d < bd) { bd = d; best = c; } }
+      const kav = b.kAvoid || {};
+      for (const c of M.cages) if (S.cages[c.id] == null && !S.cageBroken[c.id] && !(kav['hook:' + c.id] > S.t)) { const d = Math.hypot(c.x - p.x, c.z - p.z) - (c.id === b.hookGoal ? 4 : 0); if (d < bd) { bd = d; best = c; } }
       if (best) b.hookGoal = best.id;
       if (!best) { sim.onMsg(p.id, { t: 'act', a: 'drop-carry' }); return; }
       const it = findInteraction(M, S, p);
-      if (it && it.k === 'cage') { p.yaw = Math.atan2(best.x - p.x, best.z - p.z); this.setE(p, b, true); this.move(p, b, 0, 0, dt, false); b.leaveCage = { x: best.x, z: best.z, t: 14 }; b.target = null; b.search = null; return; }
+      if (it && it.k === 'cage') { p.yaw = Math.atan2(best.x - p.x, best.z - p.z); this.setE(p, b, true); this.move(p, b, 0, 0, dt, false); b.leaveCage = { x: best.x, z: best.z, t: 14 }; b.target = null; b.search = null; b.trapHook = p.char === 'grandpa' && Math.random() < 0.6; return; }
       this.goTo(p, b, best.x, best.z, 'cage' + best.id, dt, true, 2);
       return;
     }
@@ -613,6 +650,8 @@ export class Bots {
       }
     }
     if (b.leaveCage && b.leaveCage.t > 0) b.leaveCage.t -= dt;
+    // Grandpa: a trap on the way to the hook he just used, for whoever comes to the rescue
+    if (b.trapHook && b.leaveCage && p.ab2Cd <= 0 && p.carry == null && !p.act) { const dh = Math.hypot(b.leaveCage.x - p.x, b.leaveCage.z - p.z); if (dh > 2.6 && dh < 6) { b.trapHook = false; sim.onMsg(p.id, { t: 'act', a: 'ability2' }); } else if (dh >= 6) b.trapHook = false; }
     // ignore survivors around the cage we just used (no camping)
     if (target && b.leaveCage && b.leaveCage.t > 0 && Math.hypot(target.x - b.leaveCage.x, target.z - b.leaveCage.z) < 12 && dist(p, target) > 4) target = null;
     // drop a chase that has gone on too long without a hit
@@ -628,7 +667,8 @@ export class Bots {
 
     // pick up downed survivors (if not mid-chase with someone close)
     let downed = null, dd = 1e9;
-    if (modeOf(S) !== 'infection' && !p.harmless && !p.noCage) for (const s of S.players) if (s.role === 'survivor' && s.st === 'down') { const d = dist(p, s); if (d < dd) { dd = d; downed = s; } }
+    if (modeOf(S) !== 'infection' && !p.harmless && !p.noCage) for (const s of S.players) if (s.role === 'survivor' && s.st === 'down' && !((b.kAvoid || {})['down:' + s.id] > S.t)) { const d = dist(p, s); if (d < dd) { dd = d; downed = s; } }
+    b.downGoal = downed ? downed.id : null;
     // Chucky: sometimes possess the survivor he just put down instead of carrying them
     if (downed && sim.possessionOn && p.char === 'chucky' && !p.disguise && p.possCd <= 0 && dd < 2 && !sim.possession) {
       b.possPlan ||= {}; const key = downed.id + ':' + downed.stage;
@@ -703,13 +743,8 @@ export class Bots {
       if (p.char === 'chucky' && !p.harmless && !target && p.ab2Cd <= 0 && Math.random() < dt * 0.15) sim.onMsg(p.id, { t: 'act', a: 'ability2' });
       if (p.char === 'granny' && !p.tele) {
         // Bat Rush: wind up just long enough to reach them, then charge
-        const RB = KILLERS.granny.ability, GS = KILLERS.granny.shotgun;
-        // Grandpa: raise the shotgun at range (it only hurts from a distance), then fire
-        if (p.skin === 'grandpa') {
-          if (target && los && !b.aim && p.abCd <= 0 && !p.ab && !p.atk && d > 7 && d < 32 && this.clearLine(p.x, p.z, tx, tz, p.fl)) {
-            b.aim = true; b.aimT = GS.raise + 0.15 + D.react * 0.35; sim.onMsg(p.id, { t: 'in', e: false, aim: true });
-          }
-        } else if (target && los && !b.aim && !p.dash && p.abCd <= 0 && !p.ab && !p.atk && d > 3.2 && d < RB.maxDist + 0.5 && this.clearLine(p.x, p.z, tx, tz, p.fl) && this.willing(b, D, dt)) {
+        const RB = KILLERS.granny.ability;
+        if (target && los && !b.aim && !p.dash && p.abCd <= 0 && !p.ab && !p.atk && d > 3.2 && d < RB.maxDist + 0.5 && this.clearLine(p.x, p.z, tx, tz, p.fl) && this.willing(b, D, dt)) {
           const k = Math.max(0, Math.min(1, (d + 0.8 - RB.minDist) / (RB.maxDist - RB.minDist)));
           b.aim = true; b.aimT = RB.minCharge + k * (RB.maxCharge - RB.minCharge) + 0.05 + D.react * 0.15; sim.onMsg(p.id, { t: 'in', e: false, aim: true });
         }
@@ -726,6 +761,21 @@ export class Bots {
           if (g) sim.onMsg(p.id, { t: 'act', a: 'creep', kind: 'gen', id: g.id });
         }
       }
+      if (p.char === 'grandpa' && !p.tele) {
+        // raise the shotgun at range (it hits hardest from a distance), then fire
+        const GS = KILLERS.grandpa.shotgun;
+        if (target && los && !b.aim && p.abCd <= 0 && !p.atk && d > 5 && d < 30 && this.clearLine(p.x, p.z, tx, tz, p.fl) && this.willing(b, D, dt)) {
+          b.aim = true; b.aimT = GS.raise + 0.15 + D.react * 0.35; sim.onMsg(p.id, { t: 'in', e: false, aim: true });
+        }
+      }
+      if (p.char === 'slendrina' && !p.tele && !b.aim) {
+        // Cursed Gaze when someone is close and can see her
+        if (target && los && d < 18 && p.ab2Cd <= 0 && !(p.gaze > 0) && Math.random() < dt * 1.5) sim.onMsg(p.id, { t: 'act', a: 'ability2' });
+        // Haunt: appear right beside them, even through a wall (only if she knows where they are)
+        if (target && p.abCd <= 0 && !p.atk && d > 6 && d < KILLERS.slendrina.ability.range && (p.fl || 0) < 10 && (!los || d > 9) && this.willing(b, D, dt)) {
+          b.aim = true; b.aimT = 0.2 + D.react * 0.3; sim.onMsg(p.id, { t: 'in', e: false, aim: true });
+        }
+      }
       if (p.char === 'bateman' && target && los && p.abCd <= 0 && p.ammo > 0 && d > 5 && d < 17 && !p.atk && this.clearLine(p.x, p.z, tx, tz)) {
         if (!b.aim) { b.aim = true; b.aimT = 0.45 + D.react * 0.4; sim.onMsg(p.id, { t: 'in', e: false, aim: true }); }
       }
@@ -733,7 +783,7 @@ export class Bots {
       if (b.aim) {
         b.aimT -= dt;
         // lead the target
-        const lead = p.skin === 'grandpa' ? 0 : d / (p.char === 'bateman' ? 26 : p.char === 'chucky' ? 14 : p.char === 'granny' ? 13 : 32);
+        const lead = p.char === 'grandpa' || p.char === 'slendrina' ? 0 : d / (p.char === 'bateman' ? 26 : p.char === 'chucky' ? 14 : p.char === 'granny' ? 13 : 32);
         const vx = target ? (target.x - (b.prevTX ?? target.x)) / Math.max(dt, 1e-3) : 0, vz = target ? (target.z - (b.prevTZ ?? target.z)) / Math.max(dt, 1e-3) : 0;
         const ax = tx + vx * lead * D.aim, az = tz + vz * lead * D.aim;
         p.yaw = Math.atan2(ax - p.x, az - p.z) + (Math.random() - 0.5) * (1 - D.aim) * 0.25;
@@ -741,8 +791,12 @@ export class Bots {
           b.aim = false;
           if (target && p.char === 'chucky') {
             sim.onMsg(p.id, { t: 'act', a: 'pounce', yaw: p.yaw });
-          } else if (p.char === 'granny') {
+          } else if (p.char === 'granny' || p.char === 'grandpa') {
             sim.onMsg(p.id, { t: 'act', a: 'rush', yaw: p.yaw });
+          } else if (p.char === 'slendrina') {
+            // just ahead of where they are running
+            const tv3 = target ? (b.vel[target.id] || { x: 0, z: 0 }) : { x: 0, z: 0 };
+            sim.onMsg(p.id, { t: 'act', a: 'haunt', x: tx + tv3.x * 0.6, z: tz + tv3.z * 0.6 });
           } else if (target && p.char === 'bateman') {
             // flat, fast throw: aim low enough that the arc still crosses chest height at the target
             const ft = Math.hypot(ax - p.x, az - p.z) / 26, vy = (1.1 - 1.3 + 4.5 * ft * ft) / Math.max(0.05, ft) - 2.2;
@@ -832,6 +886,12 @@ export class Bots {
     }
     if (gi >= 0) {
       const g = M.gens[gi];
+      const gdist = Math.hypot(g.x - p.x, g.z - p.z);
+      if (p.char === 'grandpa' && p.ab2Cd <= 0 && gdist < 4.5 && gdist > 2 && S.gens[gi].p > 0.1 && !S.bears.some(t => Math.hypot(t.x - g.x, t.z - g.z) < 7) && Math.random() < dt * 1.2) sim.onMsg(p.id, { t: 'act', a: 'ability2' });
+      if (p.char === 'slendrina' && p.abCd <= 0 && !p.tele && gdist > 22 && (p.fl || 0) < 10 && Math.random() < dt * 0.6) {
+        const k = KILLERS.slendrina.ability.range / gdist;
+        sim.onMsg(p.id, { t: 'in', e: false, aim: true }); sim.onMsg(p.id, { t: 'act', a: 'haunt', x: p.x + (g.x - p.x) * k, z: p.z + (g.z - p.z) * k }); sim.onMsg(p.id, { t: 'in', e: false, aim: false });
+      }
       if (p.char === 'lamplighter' && p.teleCd <= 0 && !p.tele) {
         const L = S.lanterns.find(L => Math.hypot(L.x - g.x, L.z - g.z) < 10 && Math.hypot(L.x - p.x, L.z - p.z) > 22);
         if (L) { sim.onMsg(p.id, { t: 'act', a: 'teleport', id: L.id, yaw: Math.atan2(L.x - p.x, L.z - p.z) }); b.path = null; return; }

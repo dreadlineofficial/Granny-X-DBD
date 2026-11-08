@@ -23,7 +23,7 @@ async function bytes(name) {
   throw last;
 }
 // height (m) and which way the raw model faces
-const SPEC = { granny: { h: 1.82, yaw: 0 }, granny_anims: { anim: true }, grandpa: { h: 1.86, yaw: 0 }, spidermom: { h: 1.15, yaw: 0 } };
+const SPEC = { granny: { h: 1.82, yaw: 0 }, granny_anims: { anim: true }, grandpa: { h: 1.86, yaw: 0 }, spidermom: { h: 1.15, yaw: 0 }, slendrina: { h: 1.78, yaw: 0 } };
 function load(name) {
   if (loading[name]) return loading[name];
   loading[name] = bytes(name).then(buf => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej))).then(g => {
@@ -70,6 +70,9 @@ export const loadGrandpa = () => load('grandpa');
 // Spider Mom (helper): "Spider Mom - Granny" by DVUnit (sketchfab.com/DVUnit), CC BY 4.0, with her own clips
 export const loadSpiderMom = () => load('spidermom');
 export const spiderMomReady = () => !!M.spidermom;
+// Slendrina (killer): "Slendrina (Granny 3)" by DVUnit (sketchfab.com/DVUnit), CC BY 4.0, with her own clip
+export const loadSlendrina = () => load('slendrina');
+export const slendrinaReady = () => !!M.slendrina;
 export const grandpaReady = () => !!M.grandpa;
 export const grannyReady = () => !!(M.granny && M.granny_anims);
 export function onGrannyReady(cb) { if (grannyReady()) cb(); else loadGranny().then(() => grannyReady() && cb()); }
@@ -105,8 +108,13 @@ class AnimRig {
     if (first) { this.w[first] = 1; this.acts[first].setEffectiveWeight(1); }
   }
   material(src, sk, lite) {
-    let m = lite ? new THREE.MeshLambertMaterial({ color: src.color, map: src.map || null, side: src.side, transparent: src.transparent, alphaTest: src.alphaTest }) : src.clone();
-    if (sk.tint != null) m.color = new THREE.Color(src.color).lerp(new THREE.Color(sk.tint), sk.tintK ?? 0.5);
+    // Grandpa's file darkens his body and gun to 30-40% and adds a flat grey glow: at night that drew a black
+    // silhouette. Use the texture as it is.
+    const fix = /^(TextureAtlasGrandpa|Shotgun)$/.test(src.name || '');
+    const col = fix ? new THREE.Color(0.92, 0.92, 0.92) : src.color;
+    let m = lite ? new THREE.MeshLambertMaterial({ color: col, map: src.map || null, side: src.side, transparent: src.transparent, alphaTest: src.alphaTest }) : src.clone();
+    if (fix) { m.color = col.clone(); if (m.emissive) m.emissive.setRGB(0, 0, 0); }
+    if (sk.tint != null) m.color = new THREE.Color(col).lerp(new THREE.Color(sk.tint), sk.tintK ?? 0.5);
     if (sk.glow != null && 'emissive' in m) { m.emissive = new THREE.Color(sk.glow); m.emissiveIntensity = sk.glowK ?? 0.4; }
     return m;
   }
@@ -179,11 +187,28 @@ class GrannyRig extends AnimRig {
     S.t.position.copy(S.t.parent.worldToLocal(root.localToWorld(want)));
   }
 }
+export function makeSlendrinaGlb(sk = {}, lite = false) {
+  if (!M.slendrina) return null;
+  const R = new AnimRig('slendrina', sk, lite);
+  Object.assign(R, { kind: 'killer', killer: 'slendrina', glb: true, slendrina: true, float: true });
+  return R;
+}
+// Slendrina floats: a slow bob, her one clip (arms drifting) looping, faster when she strikes or stares
+export function animateSlendrina(R, s, dt) {
+  R.t += dt;
+  const a = R.acts.SlendrinaMoves || Object.values(R.acts)[0];
+  if (a) { a.setEffectiveWeight(1); a.paused = false; a.timeScale = s.atk === 1 ? 3.2 : s.gaze ? 1.8 : s.speed > 0.3 ? 1.3 : 0.8; }
+  R.mixer.update(dt);
+  R.holder.position.y = 0.16 + Math.sin(R.t * 1.7) * 0.07;
+  // she leans into a strike, and tips back when stunned
+  const lean = s.atk === 1 ? 0.28 : s.stun ? -0.22 : s.speed > 2 ? 0.1 : 0;
+  R.holder.rotation.x += (lean - R.holder.rotation.x) * Math.min(1, dt * 8);
+}
 export function makeGrannyGlb(sk = {}, lite = false) {
   if (sk.grandpa) {
     if (!M.grandpa) return null;
     const R = new AnimRig('grandpa', sk, lite);
-    Object.assign(R, { kind: 'killer', killer: 'granny', glb: true, granny: true, grandpa: true });
+    Object.assign(R, { kind: 'killer', killer: 'grandpa', glb: true, granny: true, grandpa: true });
     // Granny's states -> his clips
     R.clipMap = { idle: 'idle', Walk: 'walk', Hit: 'attack', Shoot: 'shootGun', arrowHit: 'arrowHit', pepperHit: 'peppered', freezeTrap: 'frozen', Look: 'search', lookBed: 'underbed' };
     R.root.traverse(o => { if (o.isMesh && /Glasses|Hat_Santa|RedEyes|Ragdoll/i.test(o.name)) o.visible = false; });

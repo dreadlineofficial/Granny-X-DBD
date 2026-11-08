@@ -5,7 +5,7 @@ import { tex } from './textures.js';
 import { makeForemanGlb, animateGlb } from './foremanGlb.js';
 import { makeChuckyGlb, animateChucky } from './chuckyGlb.js';
 import { makeSlappy, animateSlappy } from './slappyGlb.js';
-import { makeGrannyGlb, animateGranny } from './grannyGlb.js';
+import { makeGrannyGlb, animateGranny, makeSlendrinaGlb, animateSlendrina } from './grannyGlb.js';
 import { makeRealism } from './realism.js';
 import { makeStaticKiller, animateStaticKiller, cloneStatic } from './glbModels.js';
 import { applySkinFx } from './skinfx.js';
@@ -301,6 +301,8 @@ export function makeKiller(id, sk = {}) {
   if (id === 'bateman') return makeBateman(sk);
   if (id === 'chucky') return (sk.slappy && makeSlappy(sk, DETAIL.lite)) || makeChuckyGlb(sk, DETAIL.lite) || makeDoll(sk);
   if (id === 'granny') { const g = makeGrannyGlb(sk, DETAIL.lite); if (g) return g; }
+  if (id === 'grandpa') { const g = makeGrannyGlb({ ...sk, grandpa: true }, DETAIL.lite); if (g) return g; id = 'granny'; } // (until his model is in: Granny's stand-in)
+  if (id === 'slendrina') { const g = makeSlendrinaGlb(sk, DETAIL.lite); if (g) return g; id = 'wisp'; }
   if (id === 'foreman') { const g = makeForemanGlb(sk, DETAIL.lite); if (g) { applySkinFx(g, sk); return g; } }
   const R = new Rig();
   if (id === 'foreman') {
@@ -586,6 +588,7 @@ export function animate(R, s, dt) {
   if (R.staticGlb) return animateStaticKiller(R, s, dt);
   if (R.slappy) return animateSlappy(R, s, dt);
   if (R.chucky) return animateChucky(R, s, dt);
+  if (R.slendrina) return animateSlendrina(R, s, dt);
   if (R.granny) return animateGranny(R, s, dt);
   if (R.glb) return animateGlb(R, s, dt);
   R.t += dt;

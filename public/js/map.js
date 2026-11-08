@@ -4,6 +4,7 @@ import { HALF } from './config.js';
 import { buildMeatworks } from './meatworks.js';
 import { buildGrannyHouse } from './grannyhouse.js';
 import { THEMES, BIG_MAPS } from './themes.js';
+import { HOUSE1_BOXES, HOUSE1_FOOT } from './granny1grid.js';
 
 export function rng(seed) {
   let a = seed >>> 0;
@@ -93,11 +94,19 @@ export function makeCtx(M, R, cx, cz, rot) {
 
 
 
-export function buildMap(seed) {
-  const M = buildGrannyHouse(seed);
+export function buildMap(seed, map) {
+  const M = map === 'granny1' ? buildArena(seed, 'granny1') : buildGrannyHouse(seed);
   addChests(M, seed);
   return M;
 }
+// "Granny's Old House": the Granny 1 house stands in the middle of the woods. It is one big solid landmark
+// (played around, not inside); the set pieces of the woods ring it, pushed out so none of them touch it.
+const HOUSE1 = {
+  glb: 'granny1_map', theme: 'granny1',
+  // cell centres along x and z (the middle ring stands back from the house: 25m x 32m)
+  xs: [-44, -24.5, 0, 24.5, 44], zs: [-44, -26, 0, 26, 44],
+  foot: (x, z) => { const F = HOUSE1_FOOT, j = Math.floor((z - F.Z0) / F.CELL), i = Math.floor((x - F.X0) / F.CELL), r = F.rows[j]; return !!r && i >= 0 && i < r.length && r[i] === '1'; },
+};
 // Chests: a few on every map, away from generators, hooks, gates and spawns, each one on open ground
 // the bots can walk to. What's inside is rolled when it is first opened (sim).
 function addChests(M, seed) {
@@ -125,14 +134,20 @@ function addChests(M, seed) {
 function buildArena(seed, map) {
   const R = rng(seed);
   const BIG = BIG_MAPS[map] || null; // Infection maps reuse a theme on a bigger grid
-  const base = BIG ? BIG.base : map;
+  const H = map === 'granny1' ? HOUSE1 : null; // a house in the middle
+  const base = BIG ? BIG.base : H ? 'woods' : map;
   const TH = THEMES[base] || null; // outdoor themes (marsh, carnival, snow); woods when null
   const N = BIG ? BIG.N : 5, half = N * 10 + 6, off = (N - 1) * 10, mid = (N - 1) / 2;
   const M = {
-    seed, map: TH ? base : 'woods', mapId: map, half, props: [], pools: [], lights: [], boxes: [], circles: [], windows: [], bars: [], gens: [], cages: [], gates: [],
+    seed, map: H ? H.theme : TH ? base : 'woods', mapId: map, half, props: [], pools: [], lights: [], boxes: [], circles: [], windows: [], bars: [], gens: [], cages: [], gates: [],
     visual: [], trees: [], rocks: [], spawns: { survivors: [], killer: null },
   };
-  const theme = TH ? TH.style : R.pick(['brick', 'wood', 'stone']);
+  if (H) {
+    // the house: its own model draws it; these boxes are its walls (see granny1grid.js)
+    M.glbScene = H.glb; M.isIndoors = H.foot;
+    for (const [x, z, hx, hz] of HOUSE1_BOXES) M.boxes.push({ x, z, hx, hz, h: 4, kind: 'mesh', style: 'none', nocast: true });
+  }
+  const theme = TH ? TH.style : H ? 'wood' : R.pick(['brick', 'wood', 'stone']);
 
   const S = theme;
   const templates = TH ? TH.templates(S, M, R) : {
@@ -209,9 +224,10 @@ function buildArena(seed, map) {
   // ---------- place cells ----------
   const cells = [];
   const tnames = TH ? TH.names : ['shack', 'lwall', 'jungle', 'stones', 'barn', 'grove', 'open', 'shack', 'lwall', 'jungle', 'stones', 'grove'];
-  const centre = TH ? TH.center : 'chapel';
+  const centre = TH ? TH.center : H ? 'house' : 'chapel';
+  templates.house = () => ({ G: null, C: null, trees: [] }); // (the house map's middle: the house itself)
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
-    const cx = -off + i * 20, cz = -off + j * 20;
+    const cx = H ? H.xs[i] : -off + i * 20, cz = H ? H.zs[j] : -off + j * 20;
     if (i === mid && j === mid) { cells.push({ i, j, cx, cz, t: centre, rot: R.int(0, 1) * 2 }); continue; }
     cells.push({ i, j, cx: cx + R.range(-1, 1), cz: cz + R.range(-1, 1), t: R.pick(tnames), rot: R.int(0, 3) });
   }
@@ -233,9 +249,9 @@ function buildArena(seed, map) {
 
   // generators: chapel + 6 spread-out cells
   const chapel = cells.find(c => c.t === centre);
-  const genCells = [chapel];
+  const genCells = chapel.G ? [chapel] : [];
   const isCorner = c => (c.i === sc[0] && c.j === sc[1]) || (c.i === kc[0] && c.j === kc[1]);
-  const pool = R.shuffle(cells.filter(c => c !== chapel && !isCorner(c)));
+  const pool = R.shuffle(cells.filter(c => c !== chapel && !isCorner(c) && c.G));
   const nGens = BIG ? BIG.gens : 7, nCages = BIG ? BIG.cages : 7;
   for (let minD = 30; genCells.length < nGens && minD > 0; minD -= 4)
     for (const c of pool) {
@@ -277,8 +293,8 @@ function buildArena(seed, map) {
   addGates(M, gateDefs, TH ? TH.boundary : 'stone');
 
   // ---------- spawns ----------
-  const ccx = -off + sc[0] * 20, ccz = -off + sc[1] * 20;
-  const kcx = -off + kc[0] * 20, kcz = -off + kc[1] * 20;
+  const ccx = H ? H.xs[sc[0]] : -off + sc[0] * 20, ccz = H ? H.zs[sc[1]] : -off + sc[1] * 20;
+  const kcx = H ? H.xs[kc[0]] : -off + kc[0] * 20, kcz = H ? H.zs[kc[1]] : -off + kc[1] * 20;
   for (let i = 0; i < 4; i++) M.spawns.survivors.push(freePoint(M, ccx + (i % 2) * 2.4 - 1.2, ccz + Math.floor(i / 2) * 2.4 - 1.2, 0.6));
   // big maps: survivor groups start spread around the edges (first group in the corner above)
   if (BIG) for (const [a, b] of [[mid, 0], [0, mid], [N - 1, mid], [mid, N - 1], [sc[0], N - 1 - sc[1]]]) {
@@ -421,7 +437,7 @@ export function freePoint(M, x, z, r) {
     }
   return { x, z };
 }
-function overlaps(M, x, z, r) {
+export function overlaps(M, x, z, r) {
   for (const b of M.boxes) if (Math.abs(x - b.x) < b.hx + r && Math.abs(z - b.z) < b.hz + r) return true;
   for (const c of M.circles) if (Math.hypot(x - c.x, z - c.z) < c.r + r) return true;
   return false;
@@ -486,7 +502,14 @@ export function buildGrid(M) {
     for (const b of M.bars) { const bb = barBox(b); if (Math.abs(x - bb.x) < bb.hx + 0.25 && Math.abs(z - bb.z) < bb.hz + r) { type[k] = 3; ref[k] = b.id; } }
     for (const g of M.gates) if (Math.abs(x - g.door.x) < g.door.hx + 0.1 && Math.abs(z - g.door.z) < g.door.hz + r) { type[k] = 4; ref[k] = g.id; }
   }
-  M.grid = { N, ext, type, ref };
+  // one-cell-wide passages: a survivor fits, a killer (wider) may not
+  const narrow = new Uint8Array(N * N);
+  for (let k = 0; k < N * N; k++) {
+    if (type[k] === 1) continue;
+    const i = k % N, j = (k / N) | 0;
+    if ((i > 0 && i < N - 1 && type[k - 1] === 1 && type[k + 1] === 1) || (j > 0 && j < N - 1 && type[k - N] === 1 && type[k + N] === 1)) narrow[k] = 1;
+  }
+  M.grid = { N, ext, type, ref, narrow };
 }
 
 export function cellOf(M, x, z) {
@@ -500,7 +523,7 @@ export function cellPos(M, k) {
   return { x: -g.ext + ((k % g.N) + 0.5) * CELL, z: -g.ext + (Math.floor(k / g.N) + 0.5) * CELL };
 }
 
-// A* on the nav grid. costFn(type, ref) -> extra cost or Infinity
+// A* on the nav grid. costFn(type, ref, narrow) -> extra cost or Infinity
 export function findPath(M, sx, sz, tx, tz, costFn, maxIter = 40000) {
   const g = M.grid, N = g.N;
   let start = cellOf(M, sx, sz), goal = cellOf(M, tx, tz);
@@ -531,7 +554,7 @@ export function findPath(M, sx, sz, tx, tz, costFn, maxIter = 40000) {
       if (ni < 0 || nj < 0 || ni >= N || nj >= N) continue;
       const nk = nj * N + ni;
       if (shut[nk] === st) continue;
-      const c = costFn(g.type[nk], g.ref[nk]);
+      const c = costFn(g.type[nk], g.ref[nk], g.narrow ? g.narrow[nk] : 0);
       if (c === Infinity) continue;
       if (di && dj && (costFn(g.type[j * N + ni], g.ref[j * N + ni]) === Infinity || costFn(g.type[nj * N + i], g.ref[nj * N + i]) === Infinity)) continue;
       const ng = G[k] + (di && dj ? 1.414 : 1) * c;

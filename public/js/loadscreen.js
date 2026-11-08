@@ -14,6 +14,9 @@ const TIPS = [
   'Pallets and windows win chases. Do not waste them.',
   'Spider Mom crawls between generators. If she sees you, Granny knows.',
   "Grandpa's shotgun hits hardest from far away. Get close, or get behind something.",
+  "Grandpa hides bear traps in the grass. Watch where you run.",
+  "When Slendrina's eyes open, look away. The longer you stare, the worse it gets.",
+  "Slendrina can step through walls. A wall between you is not as safe as it looks.",
   'Five generators power the exit gates. Work on them together to finish faster.',
 ];
 
