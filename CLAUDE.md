@@ -9,7 +9,7 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
   Don't turn on GitHub Pages or upload it anywhere else unless the owner asks. Hand builds to the
   owner directly as files (the .exe zip, the .apk, videos). Built files (GrannyDBD.html, exe, apk)
   are not committed: rebuild them with the commands below.
-- **Killers: Granny, Grandpa (his own killer since 1.1, no longer an outfit) and Slendrina.**
+- **Killers: Granny, Grandpa (his own killer since 1.1, no longer an outfit), Slendrina and Angeline (1.3).**
 - **Survivors: only Mara, Eli, June and Tomás.**
 - **Maps: Granny's House (`granny`) and Granny's Old House (`granny1`).** No other maps.
 - Removed for good (don't bring back): sidekicks and their store section, ghost traps, all lore,
@@ -31,12 +31,17 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
     map). One generator is placed inside at build time by `placeHouseGen` (deepest spot reachable from the door).
   - `game.js` rendering/input/HUD per frame; `models.js` + `*Glb.js` character models; `world.js` scene.
   - `net.js` online (MQTT relay + self-signalled WebRTC), `snap.js` snapshots, `friends.js`, `awards.js`.
-  - `loadscreen.js` the 3D loading screen (Granny walking a 22 s loop, Spider Mom, flickering lamps, tips).
+  - `loadscreen.js` the 3D loading screen (1.3: a killer reel in front of Granny's House: each killer steps out
+    under a swinging bulb for 5.6 s with a name + powers card; soft light cone, dust, fog; `window.__lsSeek(t)` for shots).
     `showLoading(on, msg, isLite, rendererOf)`; it renders with the game's own renderer; the main loop
     skips the menu/game while it's up; `HostSession.start` is async with a frame yield between steps
     (this fixed the STATUS_ACCESS_VIOLATION freeze when loading into a match).
   - `touch.js` phone/tablet controls (joystick left, drag-to-look right, context buttons), `body.touch` CSS.
-- `public/models/*.glb` (granny, grandpa, granny_anims, granny_map, granny1_map, slendrina, spidermom, …), `public/img`, `public/fonts`.
+    Mobile mode (`MOBILE` = touch device or `window.__forceTouch`; `html.mobile`): no keyboard/mouse hint anywhere.
+    `touchName(id)` maps keybind ids / 'LMB' / 'RMB' / 'V' to button names (game.js `KL()` / `B()` / `kbd()`),
+    `mobileText()` rewrites "Hold G" / "Press R" / "click" in descriptions and feed lines; `.pc-only` is hidden,
+    `.touch-word` only shows on mobile; the skill check dial is tappable and VAULT reads HIT! during one.
+- `public/models/*.glb` (granny, grandpa, granny_anims, granny_map, granny1_map, slendrina, angeline, granny_bear_trap, spidermom, …), `public/img`, `public/fonts`.
 - `tools/build.mjs` → builds **`GrannyDBD.html`** (offline single file, GLBs embedded) and **`index.html`** (web).
 - `tools/electron/` Windows app (Electron 33.2.1). `tools/android/` APK build (no Gradle).
 - `server.js` optional LAN server (`node server.js 8090`), `start-*.bat/.sh/.command` launchers.
@@ -44,7 +49,12 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
 
 ## Identity / namespacing (keep separate from Nightbound)
 - localStorage prefix `gdbd_` (e.g. `gdbd_settings`, `gdbd_profile`).
-- Relay topics `grannydbd/v1/...`, PeerJS prefix `grannydbd-v1-`. `NET_PROTOCOL = 11`, `VERSION = '1.2.0'` (config.js).
+- Relay topics `grannydbd/v1/...`, PeerJS prefix `grannydbd-v1-`. `NET_PROTOCOL = 12`, `VERSION = '1.3.0'` (config.js).
+- Public lobbies (1.3): the host publishes a retained message on `grannydbd/v1/pub/<4-char stem>` (`H.advertise(info|null)`
+  in net.js, refreshed on every lobby change and each 60 s) with an MQTT last will that clears it if the host drops.
+  `watchLobbies(cb)` subscribes `grannydbd/v1/pub/+` on every broker; main.js renders the list + Quick Join.
+  Visibility is `lobby.vis` ('public'/'private', host toggle in the lobby). Relay-mode (node server.js) rooms are code-only.
+- Official Discord: https://discord.gg/WXvAJ2sgVP (`DISCORD` in config.js): menu top-right button and pause menu.
 - Electron appId `io.github.froodyofficial.grannyxdbd`. The APK signing keystore (`release.jks`,
   alias `grannyxdbd`) is NOT in the repo: the owner keeps it. Put it in `tools/android/` and set
   `KS_PASS` before building; always sign with the same key so updates install over old versions.
@@ -72,6 +82,13 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
   flee Slendrina's gaze and her haunt arrivals, remember ~60% of the traps they see (`b.traps`), and break sideways
   when cornered (`b.cornerT`). Killers weight targets (snared, doomed, heard, low shp); Grandpa strafes at mid range
   while the gun cycles.
+- Angeline (`angeline`, third person, 1.3): Yellow Eyes (RMB hold: a 16 m beam from her eyes; 0.5 s in it = `spotted`,
+  her next hit downs; `spotT`/`inBeam`), Lullaby (R: survivors within 30 m get `drowsy` 5 s: no running, x0.75 speed).
+  Model angeline.glb (CC BY 4.0, "Angeline Unity" by A_Forogotten_Studio; SPEC yaw PI). Her camera sits wider and she fades
+  when a wall pulls the camera close.
+- Granny's House floors (1.3): `grannyfloors.js` = per-floor support maps measured from granny_map.glb; nav cells with no
+  floor under them are blocked, and `dropFloor` drops anyone who walks off an edge to the floor below. Gen/teammate
+  auras are hidden across floors. Bear traps use granny_bear_trap.glb (jaws close on `bearsnap`).
 - Headless bot-only matches (Sim + Bots, no rendering) run ~10 game minutes per second: useful to find stalls.
 
 ## Build
@@ -99,11 +116,14 @@ target needs Wine.
 sticky; `--gpu` resets it). External links go to the real browser.
 
 ### Android .apk
-Needs an Android SDK (build-tools 34, platform 34) and a JDK; the script expects `SDK=/home/user/android-sdk`.
+Uses an Android SDK at `SDK=/home/user/android-sdk` (build-tools 34, platform 34) if present; otherwise Ubuntu's packaged
+tools (`apt install aapt dalvik-exchange zipalign apksigner android-sdk-platform-23`: aapt2 + dx + android-23.jar, with
+compile-only stubs in `tools/android/stubs/`). dl.google.com is blocked in the cloud sessions, so the apt route is the one
+that works there. `KS=/path/to/release.jks` picks the keystore.
 ```bash
 tools/android/build-apk.sh /path/to/GrannyDBD.html     # → tools/android/GrannyxDBD.apk
 ```
-It sets the page viewport to 1280 CSS px (menus fit phones), compiles `src/` (MainActivity.java,
+It sets the page viewport to 1280 CSS px (menus fit phones), forces mobile mode (`__forceTouch` + `html.mobile`), compiles `src/` (MainActivity.java,
 GameClient.java — a WebView; javac -source 8 against android.jar; d8; zipalign; apksigner).
 Bump `VC`/`VN` env vars for a new version.
 
@@ -121,6 +141,11 @@ Granny-only roster and house map; Grandpa outfit; 3D loading screen; load freeze
 APK with touch controls; smarter bots (no stalls); Game Jolt header/thumbnail/page text using the
 owner's GRANNY and DBD logos (no line under them); a 57 s YouTube trailer (v2: tense synthesized
 score, re-shot scenes) and a 17 s vertical YouTube Short with a "SHE HEARD YOU." thumbnail.
+1.3: Angeline, real Granny bear trap model, Granny's House floating-floor fixes, killer-reel loading screen, sharper
+graphics (anisotropy, PCF soft shadows on medium, unsharp mask in PostShader), public/private lobbies + lobby browser,
+Discord link, mobile-only controls + APK 1.3.0 (versionCode 13). The 1.3.0 APK was signed with a NEW key (the owner's
+release.jks wasn't available), so players uninstall older APKs first; re-sign with release.jks for later updates.
+Devlog banner "ANGELINE · SLENDRINA'S MOTHER IS HERE" rendered in-engine.
 1.2: Granny's Old House enterable, stronger shotgun, taller Slendrina (1.95m), smarter bots, YouTube Short #2
 ("SHE'S NOT ALONE ANYMORE.", rendered in-engine, synthesized score).
 1.1: Grandpa as his own killer, Slendrina, Granny's Old House, bot stall fixes, portable Windows exe,
