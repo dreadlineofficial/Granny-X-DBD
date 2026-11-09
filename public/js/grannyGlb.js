@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { auraSkinMat } from './foremanGlb.js';
+import { GFX } from './gfx.js';
 
 const M = {}, loading = {}, waiters = {};
 async function bytes(name) {
@@ -147,6 +148,7 @@ class AnimRig {
     const col = fix ? new THREE.Color(0.92, 0.92, 0.92) : src.color;
     let m = lite ? new THREE.MeshLambertMaterial({ color: col, map: src.map || null, side: src.side, transparent: src.transparent, alphaTest: src.alphaTest }) : src.clone();
     if (fix) { m.color = col.clone(); if (m.emissive) m.emissive.setRGB(0, 0, 0); }
+    for (const t of [m.map, m.normalMap]) if (t && t.anisotropy !== GFX.aniso) { t.anisotropy = GFX.aniso; t.needsUpdate = true; }
     if (sk.tint != null) m.color = new THREE.Color(col).lerp(new THREE.Color(sk.tint), sk.tintK ?? 0.5);
     if (sk.glow != null && 'emissive' in m) { m.emissive = new THREE.Color(sk.glow); m.emissiveIntensity = sk.glowK ?? 0.4; }
     return m;

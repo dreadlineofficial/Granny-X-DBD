@@ -2,6 +2,7 @@
 //  - granny_map: "Granny 3 map", converted from USDZ (see README credits)
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GFX } from './gfx.js';
 
 const tpl = {}, loading = {};
 async function bytes(name) {
@@ -34,6 +35,8 @@ export function cloneScene(name, lite) {
       let mm = src;
       if (lite) mm = new THREE.MeshLambertMaterial({ color: src.color, map: src.map, side: src.side, alphaTest: src.alphaTest, transparent: src.transparent });
       else { mm = src.clone(); mm.envMapIntensity = 0.4; }
+      // full anisotropic filtering: floors and walls stay sharp at a glancing angle
+      for (const t of [mm.map, mm.normalMap, mm.roughnessMap]) if (t && t.anisotropy !== GFX.aniso) { t.anisotropy = GFX.aniso; t.needsUpdate = true; }
       cache.set(src, mm);
     }
     m.material = cache.get(src);

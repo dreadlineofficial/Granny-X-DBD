@@ -94,13 +94,16 @@ const enc = new TextEncoder(), dec = new TextDecoder();
 function mqttStr(s) { const b = enc.encode(s); return [b.length >> 8, b.length & 255, ...b]; }
 function mqttLen(n) { const out = []; do { let d = n % 128; n = Math.floor(n / 128); if (n > 0) d |= 128; out.push(d); } while (n > 0); return out; }
 export class Mqtt extends Emitter {
-  constructor(url) { super(); this.url = url; this.buf = new Uint8Array(0); this.pid = 1; this.ok = false; }
+  // will: { topic, payload }: the broker publishes it (retained) if this connection dies without a goodbye,
+  // which is how a public lobby disappears from the list when its host crashes or loses the internet
+  constructor(url, will) { super(); this.url = url; this.will = will; this.buf = new Uint8Array(0); this.pid = 1; this.ok = false; }
   connect(ms = 6000) {
     return timeout(new Promise((res, rej) => {
       const ws = this.ws = new WebSocket(this.url, ['mqtt']);
       ws.binaryType = 'arraybuffer';
       ws.onopen = () => {
-        const body = [...mqttStr('MQTT'), 4, 0x02, 0, 60, ...mqttStr('nb' + rid(10))];
+        const W = this.will;
+        const body = [...mqttStr('MQTT'), 4, W ? 0x02 | 0x04 | 0x20 : 0x02, 0, 60, ...mqttStr('nb' + rid(10)), ...(W ? [...mqttStr(W.topic), ...mqttStr(W.payload || '')] : [])];
         ws.send(new Uint8Array([0x10, ...mqttLen(body.length), ...body]));
       };
       ws.onerror = () => rej(new Error('Relay unreachable'));
@@ -129,26 +132,56 @@ export class Mqtt extends Emitter {
   }
   raw(bytes) { if (this.ws && this.ws.readyState === 1) this.ws.send(new Uint8Array(bytes)); }
   subscribe(topic) { const id = this.pid++; const body = [id >> 8, id & 255, ...mqttStr(topic), 0]; this.raw([0x82, ...mqttLen(body.length), ...body]); }
-  publish(topic, str, fast) {
+  publish(topic, str, fast, retain) {
     if (!this.ws || this.ws.readyState !== 1) return;
     if (fast && this.ws.bufferedAmount > FAST_MAX_BUFFER) return;
     const t = mqttStr(topic), p = enc.encode(str);
-    const head = [0x30, ...mqttLen(t.length + p.length), ...t];
+    const head = [retain ? 0x31 : 0x30, ...mqttLen(t.length + p.length), ...t];
     const out = new Uint8Array(head.length + p.length); out.set(head); out.set(p, head.length);
     this.ws.send(out);
   }
   close() { try { this.raw([0xe0, 0]); this.ws.close(); } catch {} }
 }
-async function connectAnyBroker(preferred) {
+async function connectAnyBroker(preferred, will) {
   const order = preferred != null ? [preferred, ...MQTT_BROKERS.keys()].filter((v, i, a) => a.indexOf(v) === i) : [...MQTT_BROKERS.keys()];
   let lastErr;
   for (const i of order) {
     if (!MQTT_BROKERS[i]) continue;
-    try { const m = new Mqtt(MQTT_BROKERS[i]); await m.connect(); m.index = i; return m; } catch (e) { lastErr = e; }
+    try { const m = new Mqtt(MQTT_BROKERS[i], will); await m.connect(); m.index = i; return m; } catch (e) { lastErr = e; }
   }
   throw lastErr || new Error('No relay reachable');
 }
 const topicBase = code => 'grannydbd/v1/' + code + '/';
+// public lobbies: each one is a retained message on its own topic, cleared when the lobby closes, goes private,
+// or its host disappears (the MQTT "last will")
+const LIST_TOPIC = 'grannydbd/v1/pub/';
+
+// Watch the public lobby list on every relay at once. onList(lobbies) is called whenever it changes.
+// Returns stop(). Lobbies are { code, name, n, max, gm, map, ing, v, p, at }.
+export function watchLobbies(onList) {
+  const found = new Map(), socks = [];
+  let stopped = false;
+  const push = () => { if (!stopped) onList([...found.values()].sort((a, b) => (a.ing - b.ing) || (b.n - a.n) || (b.at - a.at))); };
+  MQTT_BROKERS.forEach((url, i) => {
+    const m = new Mqtt(url);
+    m.connect(5000).then(() => {
+      if (stopped) { m.close(); return; }
+      socks.push(m);
+      m.on('message', (topic, text) => {
+        if (!topic.startsWith(LIST_TOPIC)) return;
+        const key = i + topic;
+        let L = null; try { L = text ? JSON.parse(text) : null; } catch {}
+        // a listing that is hours old (a host whose relay never sent its goodbye) is not shown
+        if (!L || typeof L.code !== 'string' || !(Math.abs(Date.now() - (L.t || 0)) < 30 * 60e3)) found.delete(key);
+        else found.set(key, { code: L.code.slice(0, 6), name: String(L.name || 'Host').slice(0, 16), n: L.n | 0, max: L.max | 0 || 5, gm: String(L.gm || 'classic'), map: String(L.map || ''), ing: L.ing ? 1 : 0, v: String(L.v || ''), p: L.p | 0, at: Date.now() });
+        push();
+      });
+      m.subscribe(LIST_TOPIC + '+');
+    }).catch(() => {});
+  });
+  setTimeout(push, 2500); // an empty list is an answer too
+  return () => { stopped = true; for (const m of socks) m.close(); };
+}
 
 // ---------------- HOST ----------------
 export async function hostRoom(mode) {
@@ -182,10 +215,19 @@ export async function hostRoom(mode) {
   const conns = new Map();
   const fast = new Map();  // peerId -> unreliable RTCDataChannel
   let mq = null, peer = null;
-  try { mq = await connectAnyBroker(); } catch (e) { console.warn('MQTT relay unavailable', e); }
+  const stem = rid(4), listTopic = LIST_TOPIC + stem;
+  try { mq = await connectAnyBroker(null, { topic: listTopic, payload: '' }); } catch (e) { console.warn('MQTT relay unavailable', e); }
   // the last code character tells joiners which relay broker the host is on
-  const code = rid(4) + (mq ? CODE_CHARS[24 + mq.index] : CODE_CHARS[31]);
+  const code = stem + (mq ? CODE_CHARS[24 + mq.index] : CODE_CHARS[31]);
   H.code = code;
+  // info = the public listing, or null to take the lobby off the list (private, or closing)
+  let listed = false;
+  H.advertise = info => {
+    if (!mq) return false;
+    if (!info) { if (listed) mq.publish(listTopic, '', false, true); listed = false; return true; }
+    mq.publish(listTopic, JSON.stringify({ ...info, code, t: Date.now() }), false, true); listed = true;
+    return true;
+  };
   try {
     const Peer = await loadPeer();
     peer = new Peer(PEER_PREFIX + code, peerOpts());
@@ -259,7 +301,7 @@ export async function hostRoom(mode) {
       mq.publish(topicBase(code) + 'all', str || JSON.stringify(d), isFast);
     }
   };
-  H.close = () => { clearInterval(H.mqTimer); for (const ch of fast.values()) try { ch.close(); } catch {} try { peer && peer.destroy(); } catch {} try { mq && mq.close(); } catch {} };
+  H.close = () => { try { H.advertise(null); } catch {} clearInterval(H.mqTimer); for (const ch of fast.values()) try { ch.close(); } catch {} try { peer && peer.destroy(); } catch {} try { mq && mq.close(); } catch {} };
   H.mode = 'online'; H.label = (peer ? 'direct (WebRTC)' : '') + (peer && mq ? ' + ' : '') + (mq ? 'relay' : '');
   return H;
 }

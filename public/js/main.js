@@ -25,7 +25,7 @@ import { showTrailer, trailerPlaying } from './trailer.js';
 import { showLoading, loadingUp, sceneShownAt } from './loadscreen.js';
 import { initTouch } from './touch.js';
 import { ACTIONS, bound, keyName, RESERVED } from './keybinds.js';
-import { hostRoom, joinRoom, relayAvailable } from './net.js';
+import { hostRoom, joinRoom, relayAvailable, watchLobbies } from './net.js';
 import { KILLERS, SURVIVORS, SURV_PERKS, KILLER_PERKS, DEFAULT_SURV_PERKS, DEFAULT_KILLER_PERKS, BOT_NAMES, SNAP_RATE, NET_PROTOCOL, MODES, LORE, PERK_PRICES, PERK_SLOTS, SIDEKICKS, SKINS, INBOX, VERSION, CHAPTERS, CHAPTER_OF , NEWSLETTER , PLAY_K, PLAY_S, playable, POWER_LV, powerReach } from './config.js';
 import { art, forget as forgetArt } from './portraits.js';
 import { levelOf, rankOf, rankBadge, applyMatch, SEASON, seasonTier, seasonEnds, TIERS, PIPS_PER_GRADE } from './progress.js';
@@ -111,7 +111,7 @@ function makeRenderer() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.35 * (settings.brightness || 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.shadowMap.type = settings.quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  renderer.shadowMap.type = settings.quality === 'high' || settings.quality === 'medium' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
   renderer.setPixelRatio(Math.min(1.5, q.pixel));
   renderer.setSize(innerWidth, innerHeight);
   $('game').appendChild(renderer.domElement);
@@ -126,6 +126,7 @@ function toast(msg, ms = 3500) {
   clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), ms);
 }
 function loading(on, text) { showLoading(on, text, settings.quality === 'potato' || settings.quality === 'low', () => renderer); }
+window.__showLoading = loading; // (trailer / test capture)
 const nextFrame = () => new Promise(r => setTimeout(r, 40));
 
 // ---------- 3D menu scene ----------
@@ -198,7 +199,7 @@ function openPanel(id, title, wide = false) {
   if (id === 'p-loadout') renderLoadout($('lo-body'), loTab, false);
   if (id === 'p-play') renderBotsPanel();
   if (id === 'p-settings') renderSettings();
-  if (id === 'p-online') detectModeHint();
+  if (id === 'p-online') { detectModeHint(); startBrowse(); } else stopBrowse();
   if (id === 'p-inbox') renderInbox();
   if (id === 'p-pass') renderPass();
   if (id === 'p-friends') renderFriends();
@@ -1058,7 +1059,7 @@ $('btn-host').addEventListener('click', async () => {
   try {
     const mode = await resolveMode();
     const net = await hostRoom(mode);
-    lobby = { isHost: true, net, code: net.code, mode, myId: 'host', players: [], fill: true, diff: 'normal', gm: 'classic', inGame: false, chat: [] }; lobby.map = 'granny';
+    lobby = { isHost: true, net, code: net.code, mode, myId: 'host', players: [], fill: true, diff: 'normal', gm: 'classic', inGame: false, chat: [], vis: hostVis }; lobby.map = 'granny';
     const lo = profile.survivor;
     lobby.players.push({ id: 'host', name: settings.name, role: 'survivor', char: lo.char, skin: skinId(lo.char), perks: lo.perks.slice(), pet: petOf('survivor'), host: true, loadouts: myLoadouts() });
     net.on('msg', (id, m) => hostMsg(id, m));
@@ -1072,8 +1073,58 @@ $('btn-host').addEventListener('click', async () => {
     });
     net.on('closed', r => { toast(r); leaveOnline(true); });
     showLobby();
+    advertise();
+    if (lobby.vis === 'public' && !net.advertise) toast('Public lobbies need the online relay: share the code with your friends instead.');
   } catch (e) { console.error(e); toast(e.message || String(e)); }
   loading(false);
+});
+
+// ---- public / private lobbies ----
+let hostVis = 'public';
+for (const b of $('host-vis').children) b.addEventListener('click', () => { hostVis = b.dataset.v; setSeg('host-vis', hostVis); sound.play('click'); });
+for (const b of $('lobby-vis').children) b.addEventListener('click', () => {
+  if (!lobby || !lobby.isHost) return;
+  lobby.vis = b.dataset.v; sound.play('click');
+  addChat(null, lobby.vis === 'public' ? 'The lobby is public: anyone can find it in the lobby list.' : 'The lobby is private: only players with the code can join.');
+  broadcastLobby();
+});
+// the host's entry in the public list (kept fresh while the lobby is open; taken down when private, full or closed)
+let advT = 0;
+function advertise() {
+  clearTimeout(advT);
+  if (!lobby || !lobby.isHost || !lobby.net.advertise) return;
+  const cap = lobbyCaps();
+  if (lobby.vis !== 'public') lobby.net.advertise(null);
+  else lobby.net.advertise({ name: settings.name, n: lobby.players.length, max: cap.k + cap.s, gm: lobby.gm || 'classic', map: lobby.map || 'vote', ing: lobby.inGame ? 1 : 0, v: VERSION, p: NET_PROTOCOL });
+  advT = setTimeout(advertise, 60000);
+}
+// the lobby browser on the Online screen
+let browseStop = null, browseList = [];
+function startBrowse() {
+  if (browseStop) return;
+  $('lb-list').innerHTML = '<p class="hint">Looking for lobbies…</p>'; $('lb-count').textContent = '';
+  browseStop = watchLobbies(list => { browseList = list; renderBrowse(); });
+}
+function stopBrowse() { if (browseStop) { browseStop(); browseStop = null; } }
+const joinable = L => !L.ing && L.n < L.max && L.p === NET_PROTOCOL;
+function renderBrowse() {
+  const el = $('lb-list'); if (!el) return;
+  const open = browseList.filter(joinable).length;
+  $('lb-count').textContent = browseList.length ? `${browseList.length} online · ${open} open` : '';
+  if (!browseList.length) { el.innerHTML = '<p class="hint">No public lobbies right now. Create one, and it will show up here for everyone.</p>'; return; }
+  el.innerHTML = browseList.map(L => {
+    const st = L.p !== NET_PROTOCOL ? (L.p > NET_PROTOCOL ? 'Update your game' : 'Older version') : L.ing ? 'In a match' : L.n >= L.max ? 'Full' : '';
+    const mp = L.map === 'vote' ? 'Map vote' : mapName(L.map) || 'Map vote';
+    return `<div class="lb-row${L.ing ? ' ing' : ''}${L.n >= L.max ? ' full' : ''}${L.p !== NET_PROTOCOL ? ' old' : ''}"><div><span class="lb-name">${esc(L.name)}'s lobby</span><span class="lb-sub">${esc((MODES[L.gm] || MODES.classic).name)} · ${esc(mp)}${L.v ? ' · v' + esc(L.v) : ''}</span></div>
+      <span class="lb-n">${L.n}/${L.max}</span>${st ? `<span class="lb-st">${st}</span>` : `<button class="btn small primary" data-join="${esc(L.code)}">Join</button>`}</div>`;
+  }).join('');
+  for (const b of el.querySelectorAll('[data-join]')) b.addEventListener('click', () => doJoin(b.dataset.join));
+}
+$('btn-quick').addEventListener('click', () => {
+  // the fullest open lobby: the match starts sooner
+  const L = browseList.filter(joinable).sort((a, b) => b.n - a.n)[0];
+  if (L) doJoin(L.code);
+  else { toast('No open public lobbies right now: creating one for you.'); hostVis = 'public'; setSeg('host-vis', 'public'); $('btn-host').click(); }
 });
 
 function sanitizeLoadout(role, char, perks) {
@@ -1158,7 +1209,8 @@ function applyLoadout(p, m) {
 }
 function broadcastLobby() {
   if (!lobby || !lobby.isHost) return;
-  lobby.net.broadcast({ t: 'lobby', players: lobby.players.map(({ loadouts, ...p }) => p), fill: lobby.fill, diff: lobby.diff, map: lobby.map || 'vote', gm: lobby.gm || 'classic', code: lobby.code, cands: lobby.cands || [], votes: lobby.votes || {} });
+  advertise();
+  lobby.net.broadcast({ t: 'lobby', vis: lobby.vis, players: lobby.players.map(({ loadouts, ...p }) => p), fill: lobby.fill, diff: lobby.diff, map: lobby.map || 'vote', gm: lobby.gm || 'classic', code: lobby.code, cands: lobby.cands || [], votes: lobby.votes || {} });
   renderLobby();
 }
 
@@ -1185,7 +1237,7 @@ function clientMsg(m) {
   if (!m || typeof m !== 'object' || !lobby) return;
   switch (m.t) {
     case 'welcome': lobby.myId = m.id; break;
-    case 'lobby': lobby.players = m.players; lobby.fill = m.fill; lobby.diff = m.diff; lobby.map = m.map; lobby.gm = MODES[m.gm] ? m.gm : 'classic'; lobby.cands = Array.isArray(m.cands) ? m.cands : []; lobby.votes = m.votes || {}; renderLobby(); break;
+    case 'lobby': lobby.vis = m.vis === 'public' || m.vis === 'private' ? m.vis : ''; lobby.players = m.players; lobby.fill = m.fill; lobby.diff = m.diff; lobby.map = m.map; lobby.gm = MODES[m.gm] ? m.gm : 'classic'; lobby.cands = Array.isArray(m.cands) ? m.cands : []; lobby.votes = m.votes || {}; renderLobby(); break;
     case 'reject': toast(m.reason); leaveOnline(true); break;
     case 'chat': addChat(m.name, m.text); break;
     case 'mapvote': showVote(m); break;
@@ -1237,6 +1289,10 @@ function myLobbyPlayer() { return lobby && lobby.players.find(p => p.id === lobb
 function renderLobby() {
   if (!lobby || $('p-lobby').classList.contains('hidden')) return;
   const ps = lobby.players, cap = lobbyCaps();
+  const vis = lobby.vis || '';
+  $('lobby-vis-tag').textContent = vis === 'public' ? 'Public' : vis === 'private' ? 'Private' : '';
+  $('lobby-vis-tag').className = 'vis-tag' + (vis ? ' ' + vis : ' hidden');
+  if (lobby.isHost) setSeg('lobby-vis', lobby.vis);
   const killers = ps.filter(p => p.role === 'killer');
   const survs = ps.filter(p => p.role === 'survivor');
   $('lobby-gm').value = lobby.gm || 'classic'; $('lobby-gm').disabled = !lobby.isHost;
@@ -1318,7 +1374,7 @@ $('btn-lobby-start').addEventListener('click', () => {
   let ns = roster.filter(r => r.role === 'survivor').length;
   if (lobby.fill) for (let i = 1; ns < cap.s; i++, ns++) roster.push(botSurvivor(i, used));
   if (ns === 0) { toast('At least one survivor is needed (or enable bots).'); return; }
-  lobby.inGame = true;
+  lobby.inGame = true; advertise();
   const go = map => startHostMatch(roster, { myId: 'host', difficulty: lobby.diff, net: lobby.net, kind: 'online', map, mode: lobby.gm || 'classic' });
   if ((lobby.map || 'vote') !== 'vote') { go(lobby.map); return; }
   // everyone (and the bots filling empty slots) votes on the map screen first
@@ -1340,10 +1396,12 @@ function returnToLobby() {
   endSession(); stopBG(); startBG();
   lobby.inGame = false;
   if (lobby.isHost && lobby.map === 'vote') newVote();
+  advertise();
   showLobby();
   broadcastLobby();
 }
 function leaveOnline(silent) {
+  clearTimeout(advT);
   if (lobby) { try { lobby.net.close(); } catch {} lobby = null; }
   if (session) endSession();
   $('chat-log').innerHTML = '';

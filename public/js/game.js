@@ -83,12 +83,15 @@ const RaysShader = {
 };
 
 const PostShader = {
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, red: { value: 0 }, desat: { value: 0 }, flash: { value: 0 }, vig: { value: 0.9 }, grain: { value: 0.01 }, pulse: { value: 0 }, real: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, red: { value: 0 }, desat: { value: 0 }, flash: { value: 0 }, vig: { value: 0.9 }, grain: { value: 0.01 }, pulse: { value: 0 }, real: { value: 0 }, px: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, sharp: { value: 0.4 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float time, red, desat, flash, vig, grain, pulse, real; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float time, red, desat, flash, vig, grain, pulse, real, sharp; uniform vec2 px; varying vec2 vUv;
     float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + time*7.0) * 43758.5453); }
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
+      // light sharpening (unsharp mask): crisper textures and edges after the soft bloom / AA
+      vec3 blur = (texture2D(tDiffuse, vUv + vec2(px.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(px.x, 0.0)).rgb + texture2D(tDiffuse, vUv + vec2(0.0, px.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, px.y)).rgb) * 0.25;
+      c.rgb = max(c.rgb + (c.rgb - blur) * sharp, 0.0);
       if (real > 0.0) {
         // lens: faint colour fringing toward the frame edges
         vec2 ca = (vUv - 0.5) * 0.0028 * real;
@@ -441,7 +444,7 @@ export class Game {
       this.composer.addPass(new ShaderPass(SanitizeShader));
       if (real && !this.M.indoor) { this.rays = new ShaderPass(RaysShader); this.composer.addPass(this.rays); }
       if (q.bloom) { this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.5, 0.8); this.composer.addPass(this.bloom); }
-      this.post = new ShaderPass(PostShader); this.post.uniforms.real.value = real ? 1 : 0; this.composer.addPass(this.post);
+      this.post = new ShaderPass(PostShader); this.post.uniforms.real.value = real ? 1 : 0; this.post.uniforms.sharp.value = real ? 0.45 : 0.25; this.composer.addPass(this.post);
       this.composer.addPass(new OutputPass());
     } else { this.composer = null; this.post = null; }
     // HUD
@@ -2573,6 +2576,7 @@ export class Game {
     this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight);
     if (this.composer) this.composer.setSize(innerWidth, innerHeight);
+    if (this.post) { const pr = this.renderer.getPixelRatio(); this.post.uniforms.px.value.set(1 / (innerWidth * pr), 1 / (innerHeight * pr)); }
   }
 
   dispose() {

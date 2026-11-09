@@ -3,7 +3,7 @@
 export const HALF = 56;                 // map spans -HALF..HALF on x and z
 export const TICK = 1 / 60;
 // bump when host and clients can no longer understand each other's network messages
-export const NET_PROTOCOL = 11;
+export const NET_PROTOCOL = 12;
 export const SNAP_RATE = 30;            // snapshots per second sent to clients (relay players get ~15)
 
 export const SPEED = {
@@ -378,6 +378,7 @@ export const NEWSLETTER = '';
 // Granny x DBD: four killers (Granny, Grandpa, Slendrina, Angeline) and the four original survivors
 export const PLAY_K = ['granny', 'grandpa', 'slendrina', 'angeline'], PLAY_S = ['mara', 'eli', 'june', 'tomas'];
 export const playable = c => PLAY_K.includes(c) || PLAY_S.includes(c);
+export const DISCORD = 'https://discord.gg/WXvAJ2sgVP';
 export const VERSION = '1.3.0';
 // Inbox entries with `email: true` are big updates: they are emailed to newsletter subscribers
 // automatically (tools/email-updates.mjs). Small tweaks leave it out and are never mailed.
@@ -391,6 +392,7 @@ export const INBOX = [
       'Better graphics and a new loading screen.',
       "Grandpa's bear traps now use the real Granny bear trap, and snap shut on you.",
       'Online: public lobbies anyone can join from the lobby list, or private ones with a code.',
+      'Join the official Discord server: the Discord button at the top of the menu (discord.gg/WXvAJ2sgVP).',
     ],
   },
   {
