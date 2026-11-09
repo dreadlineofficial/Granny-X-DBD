@@ -23,10 +23,10 @@ import { icon, POWER_ICON } from './icons.js';
 import { sound, loadClip } from './audio.js';
 import { showTrailer, trailerPlaying } from './trailer.js';
 import { showLoading, loadingUp, sceneShownAt } from './loadscreen.js';
-import { initTouch } from './touch.js';
+import { initTouch, MOBILE, mobileText } from './touch.js';
 import { ACTIONS, bound, keyName, RESERVED } from './keybinds.js';
 import { hostRoom, joinRoom, relayAvailable, watchLobbies } from './net.js';
-import { KILLERS, SURVIVORS, SURV_PERKS, KILLER_PERKS, DEFAULT_SURV_PERKS, DEFAULT_KILLER_PERKS, BOT_NAMES, SNAP_RATE, NET_PROTOCOL, MODES, LORE, PERK_PRICES, PERK_SLOTS, SIDEKICKS, SKINS, INBOX, VERSION, CHAPTERS, CHAPTER_OF , NEWSLETTER , PLAY_K, PLAY_S, playable, POWER_LV, powerReach } from './config.js';
+import { ITEMS, KILLERS, SURVIVORS, SURV_PERKS, KILLER_PERKS, DEFAULT_SURV_PERKS, DEFAULT_KILLER_PERKS, BOT_NAMES, SNAP_RATE, NET_PROTOCOL, MODES, LORE, PERK_PRICES, PERK_SLOTS, SIDEKICKS, SKINS, INBOX, VERSION, CHAPTERS, CHAPTER_OF , NEWSLETTER , PLAY_K, PLAY_S, playable, POWER_LV, powerReach } from './config.js';
 import { art, forget as forgetArt } from './portraits.js';
 import { levelOf, rankOf, rankBadge, applyMatch, SEASON, seasonTier, seasonEnds, TIERS, PIPS_PER_GRADE } from './progress.js';
 import { Friends, fmtCode, GIFT_MAX } from './friends.js';
@@ -35,6 +35,28 @@ import { Awards, AWARD, revealOf } from './awards.js';
 window.__nbBooted = true;
 for (const id of ['boot-loading', 'boot-error']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
 const $ = id => document.getElementById(id);
+
+// phones, tablets and the Android app: everything written for a keyboard and mouse names the touch buttons instead
+if (MOBILE) {
+  for (const D of [SURV_PERKS, KILLER_PERKS, ITEMS]) for (const d of Object.values(D)) if (d && typeof d.desc === 'string') d.desc = mobileText(d.desc, D === KILLER_PERKS ? 'granny' : '');
+  for (const [id, K] of Object.entries(KILLERS)) for (const part of ['ability', 'ability2', 'teleport', 'swap', 'feature', 'shotgun']) if (K[part] && K[part].desc) K[part].desc = mobileText(K[part].desc, id);
+  const R2 = { Granny: 'HEAR', Grandpa: 'TRAP', Slendrina: 'GAZE', Angeline: 'LULLABY' };
+  const KEYS = { Shift: 'RUN', Ctrl: 'CROUCH', E: 'USE', Space: 'VAULT', LMB: 'ATTACK', G: 'CREEP', V: 'SWAP', F: 'EXECUTE', Q: 'DROP' };
+  for (const ul of document.querySelectorAll('#p-help ul')) {
+    let h = ul.previousElementSibling; while (h && h.tagName !== 'H3') h = h.previousElementSibling;
+    const who = h ? h.textContent.trim() : '';
+    for (const li of ul.querySelectorAll('li')) {
+      const t = li.innerHTML;
+      if (t.includes('<kbd>WASD</kbd>')) { li.innerHTML = 'The <kbd>JOYSTICK</kbd> (left side of the screen) moves you; drag anywhere on the right to look around. Push it all the way, or tap <kbd>RUN</kbd>, to run. <kbd>CROUCH</kbd> sneaks. Running is loud: she hears it.'; continue; }
+      if (t.includes('hit skill checks. A failed')) { li.innerHTML = '<kbd>VAULT</kbd>: vault and drop barricades on her. Skill checks: tap the dial (or <kbd>HIT!</kbd>) when the needle is in the zone. A failed skill check is heard anywhere.'; continue; }
+      if (t.includes('<kbd>A</kbd>')) { li.innerHTML = 'When carried, push the <kbd>JOYSTICK</kbd> left and right, again and again, to struggle free'; continue; }
+      for (const k of li.querySelectorAll('kbd')) {
+        const x = k.textContent.trim();
+        k.textContent = x === 'RMB' ? (who === 'Survivors' ? 'LIGHT' : 'POWER') : x === 'R' ? (R2[who] || 'POWER 2') : KEYS[x] || x;
+      }
+    }
+  }
+}
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = {
   get(k, d) { try { const v = localStorage.getItem('gdbd_' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
@@ -351,8 +373,8 @@ function renderLoadout(container, role, compact, onChange) {
 
 // ---------- settings ----------
 const QHINT = {
-  potato: 'Very Low: for older laptops and integrated graphics. No shadows or effects, reduced draw distance.',
-  low: 'Low: no shadows or post-processing, light foliage. Good for most laptops.',
+  potato: (MOBILE ? 'Very Low: for older phones and tablets.' : 'Very Low: for older laptops and integrated graphics.') + ' No shadows or effects, reduced draw distance.',
+  low: 'Low: no shadows or post-processing, light foliage. Good for most ' + (MOBILE ? 'phones and tablets' : 'laptops') + '.',
   medium: 'Medium: shadows, bloom and color grading.',
   high: 'High: sharp shadows, dense grass and full effects. Needs a dedicated GPU.',
 };
@@ -373,8 +395,8 @@ function renderSettings() {
 }
 $('set-name').addEventListener('input', e => { settings.name = e.target.value.trim().slice(0, 16) || 'Player'; saveSettings(); renderShowcase(); });
 const SHINT = {
-  realistic: 'Realistic: real photo-scanned ground, stone, brick, wood, metal and bark (Medium/High), real fir trees, swaying grass, moonlight shafts, ambient occlusion, night colour vision and softer shadows. Needs a decent GPU: use Classic on older laptops.',
-  classic: 'Classic: the original painted look. Lighter on older laptops.',
+  realistic: 'Realistic: real photo-scanned ground, stone, brick, wood, metal and bark (Medium/High), real fir trees, swaying grass, moonlight shafts, ambient occlusion, night colour vision and softer shadows. Needs a decent GPU: use Classic on older ' + (MOBILE ? 'phones' : 'laptops') + '.',
+  classic: 'Classic: the original painted look. Lighter on older ' + (MOBILE ? 'phones' : 'laptops') + '.',
 };
 seg('set-style', v => { settings.style = v; saveSettings(); $('set-style-hint').textContent = SHINT[v]; stopBG(); makeRenderer(); startBG(); });
 seg('set-quality', v => { settings.quality = v; saveSettings(); $('set-quality-hint').textContent = QHINT[v]; stopBG(); makeRenderer(); startBG(); });

@@ -3,6 +3,35 @@
 // keybind behaves exactly as on a keyboard.
 export const isTouch = () => typeof window !== 'undefined' && (window.__forceTouch || (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) || /Android|iPhone|iPad/i.test(navigator.userAgent));
 
+// Mobile mode (phones, tablets and the Android app): every control the game names is one of these buttons,
+// never a key or a mouse button.
+export const MOBILE = isTouch();
+if (MOBILE && typeof document !== 'undefined') document.documentElement.classList.add('mobile');
+const R_BTN = { granny: 'HEAR', grandpa: 'TRAP', slendrina: 'GAZE', angeline: 'LULLABY' };
+let ctxRole = 'survivor', ctxChar = 'mara';
+export function setTouchCtx(role, char) { ctxRole = role || ctxRole; ctxChar = char || ctxChar; }
+// an action (keybind id, or 'LMB' / 'RMB' / 'V') -> the name of the on-screen button that does it
+export function touchName(id) {
+  switch (id) {
+    case 'forward': case 'back': case 'left': case 'right': return 'JOYSTICK';
+    case 'run': return 'RUN'; case 'crouch': return 'CROUCH'; case 'interact': return 'USE'; case 'space': return 'VAULT';
+    case 'item': return 'CREEP'; case 'ability2': return R_BTN[ctxChar] || 'POWER 2'; case 'drop': return 'DROP';
+    case 'execute': return ctxRole === 'killer' ? 'EXECUTE' : 'NEXT'; case 'takeover': return 'TAKE OVER'; case 'status': return 'STATUS';
+    case 'emotes': return 'EMOTE'; case 'shoulder': return 'CAMERA';
+    case 'LMB': return 'ATTACK'; case 'RMB': return ctxRole === 'killer' ? 'POWER' : 'LIGHT'; case 'V': return 'SWAP';
+  }
+  return id;
+}
+// rewrite text written for a keyboard ("Hold G", "Press R", "click") for the touch buttons
+export function mobileText(s, char) {
+  if (!MOBILE || typeof s !== 'string') return s;
+  const key = { G: 'CREEP', V: 'SWAP', R: R_BTN[char] || 'POWER 2', F: 'EXECUTE', Q: 'DROP', E: 'USE', T: 'TAKE OVER' };
+  return s.replace(/\b(Hold|hold|Press|press|Tap|tap) ([GVRFQET])\b/g, (m, v, k) => `${/^[Pp]/.test(v) ? (v[0] === 'P' ? 'Tap' : 'tap') : v} ${key[k]}`)
+    .replace(/\brelease ([GVR])\b/g, (m, k) => 'release ' + key[k])
+    .replace(/\b([Cc])lick/g, (m, c) => c === 'C' ? 'Tap' : 'tap')
+    .replace(/\bRMB\b/g, R_BTN[char] ? 'POWER' : 'LIGHT').replace(/\bLMB\b/g, 'ATTACK');
+}
+
 const $ = id => document.getElementById(id);
 let ui = null, game = null, held = new Map(), stick = null, look = null, runOn = false, crouchOn = false, stickKeys = new Set();
 
@@ -11,14 +40,14 @@ const BTN = {
   atk: ['ATTACK', 'mouse', 0], power: ['POWER', 'mouse', 2], light: ['LIGHT', 'mouse', 2],
   use: ['USE', 'hold', 'KeyE'], jump: ['VAULT', 'hold', 'Space'], run: ['RUN', 'toggle', 'ShiftLeft'], crouch: ['CROUCH', 'toggle', 'ControlLeft'],
   hear: ['HEAR', 'key', 'KeyR'], trap: ['TRAP', 'key', 'KeyR'], gaze: ['GAZE', 'key', 'KeyR'], lull: ['LULLABY', 'key', 'KeyR'], creep: ['CREEP', 'hold', 'KeyG'], swap: ['SWAP', 'hold', 'KeyV'], exec: ['EXECUTE', 'key', 'KeyF'], drop: ['DROP', 'key', 'KeyQ'],
-  take: ['TAKE OVER', 'key', 'KeyT'], next: ['NEXT', 'key', 'KeyF'], status: ['STATUS', 'hold', 'Tab'],
+  take: ['TAKE OVER', 'key', 'KeyT'], next: ['NEXT', 'key', 'KeyF'], status: ['STATUS', 'hold', 'Tab'], emote: ['EMOTE', 'key', 'KeyB'],
 };
 const LAYOUT = {
   killer: ['atk', 'power', 'use', 'jump', 'hear', 'creep', 'swap', 'exec', 'drop'],
   'killer-grandpa': ['atk', 'power', 'use', 'jump', 'trap', 'exec', 'drop'],
   'killer-slendrina': ['atk', 'power', 'use', 'jump', 'gaze', 'exec', 'drop'],
   'killer-angeline': ['atk', 'power', 'use', 'jump', 'lull', 'exec', 'drop'],
-  survivor: ['light', 'use', 'jump', 'run', 'crouch', 'status'],
+  survivor: ['light', 'use', 'jump', 'run', 'crouch', 'status', 'emote'],
   dead: ['take', 'next', 'status'],
 };
 
@@ -84,6 +113,9 @@ function build() {
   };
   lookEl.addEventListener('pointerup', end); lookEl.addEventListener('pointercancel', end);
   ui.querySelector('.tc-pause').addEventListener('click', () => key('Escape', true));
+  // skill checks: tap the dial itself (or the VAULT button, which reads HIT! while one is up)
+  const sk = $('skill');
+  if (sk) sk.addEventListener('pointerdown', e => { e.preventDefault(); key('Space', true); setTimeout(() => key('Space', false), 60); });
 }
 
 function layout(kind) {
@@ -112,6 +144,9 @@ export function initTouch() {
     ui.classList.toggle('hidden', !on);
     if (!on) return;
     const me = g.mine && g.mine();
+    if (me) setTouchCtx(me.st === 'dead' || me.st === 'out' ? 'spectator' : me.role, me.char);
     layout(!me || me.st === 'dead' || me.st === 'out' || me.st === 'ghost' ? 'dead' : me.role === 'killer' ? (LAYOUT['killer-' + me.char] ? 'killer-' + me.char : 'killer') : 'survivor');
+    const jb = ui.querySelector('[data-b=jump]'), skill = $('skill') && !$('skill').classList.contains('hidden');
+    if (jb) jb.textContent = skill ? 'HIT!' : 'VAULT';
   }, 200);
 }
