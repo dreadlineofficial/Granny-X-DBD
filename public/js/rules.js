@@ -51,13 +51,14 @@ export function speedOf(p, S, sprint, crouch) {
     if (p.st !== 'ok') return 0; // (a ghost stays where it is)
     if (p.snare > 0) return 0; // caught in Granny's bear trap
     if (p.swing || p.perchT > 0) return 0; // swinging on a web, or perched up high
-    let s = crouch ? SPEED.crouch * (has(p, 'hushed') ? 1.25 : 1) : sprint ? SPEED.run : SPEED.walk;
+    let s = crouch ? SPEED.crouch * (has(p, 'hushed') ? 1.25 : 1) : sprint && !(p.drowsy > 0) ? SPEED.run : SPEED.walk; // (drowsy from Angeline's Lullaby: no running)
     if (!crouch && sprint && p.hp === 1 && has(p, 'fleet')) s *= 1.07;
     if (p.boost > 0) s *= p.boostMul || SPEED.hitBoost;
     if (p.slimed > 0) s *= 0.7;
     if (p.card > 0) s *= 0.8; // intimidated by a business card
     if (p.webbed > 0) s *= 0.65; // caught in Spider Mom's web
     if (p.cursed > 0) s *= KILLERS.slendrina.ability2.slow; // looking at Slendrina
+    if (p.drowsy > 0) s *= KILLERS.angeline.ability2.slow;  // Angeline's Lullaby
     return S && modeOf(S) === 'adrenaline' ? s * 1.3 : s;
   }
   const K = KILLERS[p.char];
@@ -77,6 +78,7 @@ export function speedOf(p, S, sprint, crouch) {
   if (p.char === 'granny' && p.aim) s *= 0.55;  // winding up the bat
   if (p.char === 'grandpa' && p.aim) s *= 0.6;  // the shotgun raised to his shoulder
   if (p.char === 'slendrina' && p.aim) s *= 0.75; // choosing where to Haunt to
+  if (p.char === 'angeline' && p.aim) s *= KILLERS.angeline.ability.slow; // Yellow Eyes
   if ((p.char === 'harrower' || p.char === 'foreman' || p.char === 'bateman') && p.aim) s *= p.char === 'foreman' ? 0.75 : p.char === 'bateman' ? 0.6 : SPEED.aimSlow;
   if (p.diffMul) s *= p.diffMul;
   return S && modeOf(S) === 'adrenaline' ? s * 1.3 : s;

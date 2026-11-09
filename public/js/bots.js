@@ -372,6 +372,8 @@ export class Bots {
       // Grandpa's shotgun reaches far: him raising it at us, in sight, is a threat from 32m
       b.juke = false;
       if (K.char === 'grandpa' && K.aim && vis && kd < 32) { const kf = fwd(K.yaw), toMe = ((p.x - K.x) * kf.x + (p.z - K.z) * kf.z) / (kd || 1); if (toMe > 0.93) { threat = true; b.juke = true; } }
+      // Angeline's yellow eyes are on us: get out of the beam (it's narrow: a sideways dash does it)
+      if (K.char === 'angeline' && K.aim && vis && kd < 18) { const kf = fwd(K.yaw), toMe = ((p.x - K.x) * kf.x + (p.z - K.z) * kf.z) / (kd || 1); if (toMe > 0.9) { threat = true; b.juke = true; } }
       // Slendrina's eyes are open: don't stand there looking at her
       if (K.char === 'slendrina' && K.gaze > 0 && vis && kd < 26) threat = true;
       // she just appeared next to us
@@ -668,7 +670,7 @@ export class Bots {
       const heard = (s.mv === 2 && !s.cr && d < 16 && !s.perks.includes('hushed')) || (s.hp === 1 && d < 9 && !s.perks.includes('hushed'));
       if ((vis && facingOk) || (d < 5 && s.mv && !s.cr) || (scent && d < 14) || s.reveal > 0 || (heard && b.target === s.id)) {
         // (caught in a trap: a free hit; fully Cursed / Heard: one hit downs; low on Grandpa's shotgun bar)
-        const score = d - (b.target === s.id ? 8 : 0) - (s.hp === 1 ? 3 : 0) - (s.snare > 0 ? 10 : 0) - (p.char === 'slendrina' && s.doomed > 0 ? 7 : 0) - (p.char === 'granny' && s.heard > 0 ? 5 : 0) - (p.char === 'grandpa' && (s.shp ?? 100) < 60 ? 5 : 0);
+        const score = d - (b.target === s.id ? 8 : 0) - (s.hp === 1 ? 3 : 0) - (s.snare > 0 ? 10 : 0) - (p.char === 'slendrina' && s.doomed > 0 ? 7 : 0) - (p.char === 'angeline' && s.spotted > 0 ? 7 : 0) - (p.char === 'granny' && s.heard > 0 ? 5 : 0) - (p.char === 'grandpa' && (s.shp ?? 100) < 60 ? 5 : 0);
         if (score < td) { td = score; target = s; }
       }
     }
@@ -799,6 +801,14 @@ export class Bots {
           b.aim = true; b.aimT = 0.2 + D.react * 0.3; sim.onMsg(p.id, { t: 'in', e: false, aim: true });
         }
       }
+      if (p.char === 'angeline' && !p.tele) {
+        // Yellow Eyes on whoever she can see (long enough to Spot them), then close in for the one-hit down
+        if (target && los && !b.aim && p.abCd <= 0 && !p.atk && d > 2.5 && d < 14 && !(target.spotted > 0) && this.willing(b, D, dt)) {
+          b.aim = true; b.aimT = 0.75 + D.react * 0.5; sim.onMsg(p.id, { t: 'in', e: false, aim: true });
+        }
+        // Lullaby when someone is near (they can't run from her), or now and then to slow the generators down
+        if (p.ab2Cd <= 0 && ((target && d < 20) || (!target && Math.random() < dt * 0.05))) sim.onMsg(p.id, { t: 'act', a: 'ability2' });
+      }
       if (p.char === 'bateman' && target && los && p.abCd <= 0 && p.ammo > 0 && d > 5 && d < 17 && !p.atk && this.clearLine(p.x, p.z, tx, tz)) {
         if (!b.aim) { b.aim = true; b.aimT = 0.45 + D.react * 0.4; sim.onMsg(p.id, { t: 'in', e: false, aim: true }); }
       }
@@ -806,7 +816,7 @@ export class Bots {
       if (b.aim) {
         b.aimT -= dt;
         // lead the target
-        const lead = p.char === 'grandpa' || p.char === 'slendrina' ? 0 : d / (p.char === 'bateman' ? 26 : p.char === 'chucky' ? 14 : p.char === 'granny' ? 13 : 32);
+        const lead = p.char === 'grandpa' || p.char === 'slendrina' || p.char === 'angeline' ? 0 : d / (p.char === 'bateman' ? 26 : p.char === 'chucky' ? 14 : p.char === 'granny' ? 13 : 32);
         const vx = target ? (target.x - (b.prevTX ?? target.x)) / Math.max(dt, 1e-3) : 0, vz = target ? (target.z - (b.prevTZ ?? target.z)) / Math.max(dt, 1e-3) : 0;
         const ax = tx + vx * lead * D.aim, az = tz + vz * lead * D.aim;
         p.yaw = Math.atan2(ax - p.x, az - p.z) + (Math.random() - 0.5) * (1 - D.aim) * 0.25;
@@ -830,7 +840,7 @@ export class Bots {
           }
           sim.onMsg(p.id, { t: 'in', e: false, aim: false });
         }
-        this.move(p, b, Math.sin(ang) * 0.4, Math.cos(ang) * 0.4, dt, true);
+        this.move(p, b, Math.sin(ang) * (p.char === 'angeline' ? 1 : 0.4), Math.cos(ang) * (p.char === 'angeline' ? 1 : 0.4), dt, true);
         b.prevTX = target ? target.x : undefined; b.prevTZ = target ? target.z : undefined;
         return;
       }

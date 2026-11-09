@@ -23,7 +23,7 @@ async function bytes(name) {
   throw last;
 }
 // height (m) and which way the raw model faces
-const SPEC = { granny: { h: 1.82, yaw: 0 }, granny_anims: { anim: true }, grandpa: { h: 1.86, yaw: 0 }, spidermom: { h: 1.15, yaw: 0 }, slendrina: { h: 1.95, yaw: 0 } };
+const SPEC = { granny: { h: 1.82, yaw: 0 }, granny_anims: { anim: true }, grandpa: { h: 1.86, yaw: 0 }, spidermom: { h: 1.15, yaw: 0 }, slendrina: { h: 1.95, yaw: 0 }, angeline: { h: 1.88, yaw: Math.PI } };
 function load(name) {
   if (loading[name]) return loading[name];
   loading[name] = bytes(name).then(buf => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej))).then(g => {
@@ -73,6 +73,39 @@ export const spiderMomReady = () => !!M.spidermom;
 // Slendrina (killer): "Slendrina (Granny 3)" by DVUnit (sketchfab.com/DVUnit), CC BY 4.0, with her own clip
 export const loadSlendrina = () => load('slendrina');
 export const slendrinaReady = () => !!M.slendrina;
+// Angeline (killer): "Angeline Unity" by A_Forogotten_Studio (sketchfab.com/A_Forogotten_Studio), CC BY 4.0: idle, Walk, attack
+export const loadAngeline = () => load('angeline');
+export const angelineReady = () => !!M.angeline;
+export function makeAngelineGlb(sk = {}, lite = false) {
+  if (!M.angeline) return null;
+  const R = new AnimRig('angeline', sk, lite);
+  Object.assign(R, { kind: 'killer', killer: 'angeline', glb: true, angeline: true });
+  return R;
+}
+// her own three clips: walking, standing, and the strike (scrubbed with the lunge so the claws land on the hit)
+export function animateAngeline(R, s, dt) {
+  R.t += dt;
+  if (s.atk === 1 && R.prevAtk !== 1) R.hitT = 0; else if (R.hitT != null) R.hitT += dt * 1.6;
+  if (!s.atk) R.hitT = null;
+  R.prevAtk = s.atk;
+  const A = R.acts, sp = s.speed || 0;
+  let want = 'idle', rate = 1, scrub = null, fast = false;
+  const atkClip = A.attack ? A.attack.getClip().duration : 1;
+  if (s.exec && s.exec.role === 'killer') { want = 'attack'; scrub = Math.min(0.95, s.exec.f * 1.2); fast = true; }
+  else if ((s.atk === 1 || s.atk === 2) && R.hitT != null && R.hitT < atkClip) { want = 'attack'; scrub = R.hitT / atkClip; fast = true; }
+  else if (s.stun) { want = 'idle'; rate = 2.2; }
+  else if (sp > 0.3) { want = 'Walk'; rate = Math.min(2.4, Math.max(0.7, sp / 1.6)); }
+  if (!A[want]) want = A.idle ? 'idle' : Object.keys(A)[0];
+  const k = 1 - Math.exp(-dt * (fast ? 20 : 9));
+  for (const n in A) {
+    const a = A[n], target = n === want ? 1 : 0;
+    R.w[n] += (target - R.w[n]) * k; if (R.w[n] < 0.002 && !target) R.w[n] = 0;
+    a.setEffectiveWeight(R.w[n]);
+    if (n === want) { if (scrub != null) { a.paused = true; a.time = scrub * a.getClip().duration; } else { a.paused = false; a.timeScale = rate; } }
+    else if (R.w[n] === 0) a.paused = true;
+  }
+  R.mixer.update(dt);
+}
 export const grandpaReady = () => !!M.grandpa;
 export const grannyReady = () => !!(M.granny && M.granny_anims);
 export function onGrannyReady(cb) { if (grannyReady()) cb(); else loadGranny().then(() => grannyReady() && cb()); }

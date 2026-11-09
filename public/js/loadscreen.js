@@ -17,6 +17,8 @@ const TIPS = [
   "Grandpa hides bear traps in the grass. Watch where you run.",
   "When Slendrina's eyes open, look away. The longer you stare, the worse it gets.",
   "Slendrina can step through walls. A wall between you is not as safe as it looks.",
+  "Angeline's yellow eyes mark you. Step out of the light, sideways, fast.",
+  "Heard Angeline humming? You won't be running for a few seconds. Hide instead.",
   'Five generators power the exit gates. Work on them together to finish faster.',
 ];
 

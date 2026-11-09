@@ -41,7 +41,7 @@ html = html.replace(/<link rel="stylesheet" href="css\/style.css">/, () => `<sty
 html = html.replace(/<script type="importmap">[\s\S]*?<\/script>\s*/, '');
 const peer = (await readFile(join(pub, 'vendor/peerjs.min.js'), 'utf8')).replace(/<\/script/gi, '<\\/script');
 // the Foreman's rigged model as base64 in an inert tag placed before the game script (read by foremanGlb.js)
-const extraGlb = ['ghosttrap', 'granny_map', 'granny1_map', 'slendrina', 'granny', 'granny_anims', 'grandpa', 'spidermom', 'beartrap', 'taser'].map(n => `<script id="nb-${n}-glb" type="application/octet-stream">${readFileSync(join(pub, 'models/' + n + '.glb')).toString('base64')}</script>\n`).join('');
+const extraGlb = ['ghosttrap', 'granny_map', 'granny1_map', 'slendrina', 'angeline', 'granny', 'granny_anims', 'grandpa', 'spidermom', 'beartrap', 'taser'].map(n => `<script id="nb-${n}-glb" type="application/octet-stream">${readFileSync(join(pub, 'models/' + n + '.glb')).toString('base64')}</script>\n`).join('');
 const withModel = html.replace(/<script type="module" src="js\/main.js"><\/script>/, () => `${extraGlb}<script>${peer}</script>\n<script>${js}</script>`);
 // the web build stays small: it fetches public/models/foreman.glb instead of embedding it
 const web = html.replace(/<script type="module" src="js\/main.js"><\/script>/, () => `<script>${peer}</script>\n<script>${js}</script>`);

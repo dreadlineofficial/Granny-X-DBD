@@ -5,6 +5,8 @@
 // few pallet loops are laid out here.
 import { rng, makeCtx, addGates, buildGrid, freePoint, cellOf, makeLevel } from './map.js';
 import { GRANNY_BOXES, GRANNY_FLOORS } from './grannygrid.js';
+import { GRANNY_FLOOR_SUPPORT } from './grannyfloors.js';
+import { floorUnder, CELL as NAV_CELL } from './map.js';
 
 export const GRANNY_HALF = 31.6;
 // the house's footprint (no grass or lamp posts inside), the shed's too
@@ -53,6 +55,19 @@ export function buildGrannyHouse(seed) {
   M.levels = { 1: makeLevel(M, floors[0]), 2: makeLevel(M, floors[1], ring), 3: makeLevel(M, floors[2]), 10: makeLevel(M, lane), 11: makeLevel(M, lane), 12: makeLevel(M, []) };
   // ...and on the first floor, flight 1 of the stairs above
   M.levels[1].boxes.push(box([L.f1.x0, L.f1.x1, -7.4, -4.6])); M.levels[1].hash = null; buildGrid(M.levels[1]);
+  // the upper floors only reach as far as the house's real floors: off the edge you fall (players), and the bots'
+  // walking grid there stops at the edge (no more walking about in mid-air)
+  M.floorSupport = GRANNY_FLOOR_SUPPORT;
+  for (const fl of [1, 2, 3]) {
+    const G = M.levels[fl].grid, N = G.N;
+    for (let k = 0; k < N * N; k++) {
+      if (G.type[k] === 1) continue;
+      const x = -G.ext + ((k % N) + 0.5) * NAV_CELL, z = -G.ext + (Math.floor(k / N) + 0.5) * NAV_CELL;
+      // (a cell counts if most of it has floor: its centre and the four points around it)
+      let n = 0; for (const [dx, dz] of [[0, 0], [0.18, 0], [-0.18, 0], [0, 0.18], [0, -0.18]]) if (floorUnder(M, fl, x + dx, z + dz)) n++;
+      if (n < 4) G.type[k] = 1;
+    }
+  }
 
   // the outer wall's diagonal corners have gaps (one is the old bridge gate): seal them
   const seal = (x1, z1, x2, z2) => { const n = Math.ceil(Math.hypot(x2 - x1, z2 - z1) / 0.6); for (let i = 0; i <= n; i++) M.circles.push({ x: x1 + (x2 - x1) * i / n, z: z1 + (z2 - z1) * i / n, r: 0.5, h: 4, kind: 'mesh', nocast: true }); };

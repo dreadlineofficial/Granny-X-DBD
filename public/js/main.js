@@ -16,7 +16,7 @@ import { loadRealism, realismReady } from './realism.js';
 import { loadSlappy, slappyReady } from './slappyGlb.js';
 import { loadStatic } from './glbModels.js';
 import { loadScene, sceneReady } from './sceneGlb.js';
-import { loadGranny, grannyReady, onGrannyReady, loadGrandpa, loadSpiderMom, loadSlendrina, slendrinaReady, grandpaReady } from './grannyGlb.js';
+import { loadGranny, grannyReady, onGrannyReady, loadGrandpa, loadSpiderMom, loadSlendrina, slendrinaReady, grandpaReady, loadAngeline, angelineReady } from './grannyGlb.js';
 import { SnapWriter, SnapReader, Track } from './snap.js';
 import { MAP_NAMES, BIG_MAPS, REGULAR_MAPS } from './themes.js';
 import { icon, POWER_ICON } from './icons.js';
@@ -150,6 +150,7 @@ loadScene('granny_map'); loadScene('granny1_map');
 loadGranny().then(m => { if (m) { forgetArt('granny'); if (menu && menu.killerChar === 'granny') menu.setKiller('granny', menu.killerSkin); } });
 loadGrandpa().then(m => { if (m) { forgetArt('grandpa'); if (menu && menu.killerChar === 'grandpa') menu.setKiller('grandpa', menu.killerSkin); } });
 loadSlendrina().then(m => { if (m) { forgetArt('slendrina'); if (menu && menu.killerChar === 'slendrina') menu.setKiller('slendrina', menu.killerSkin); } });
+loadAngeline().then(m => { if (m) { forgetArt('angeline'); if (menu && menu.killerChar === 'angeline') menu.setKiller('angeline', menu.killerSkin); } });
 // a match with Chucky in it waits (on the loading screen) for his real model, up to 20s
 const spiderOk = () => !!window.__nbSpiderLoaded;
 loadSpiderMom().then(m => { window.__nbSpiderLoaded = !!m; });
@@ -158,7 +159,7 @@ async function waitForModels(need) {
   // the Granny's House scenery (a big model) must be in before any match can use the map
   if (!sceneReady('granny_map') || !sceneReady('granny1_map')) { loading(true, 'Unlocking Granny\'s front door…'); await Promise.race([Promise.all([loadScene('granny_map'), loadScene('granny1_map')]), new Promise(r => setTimeout(r, 25000))]); }
   // Granny and her granddaughter, when she's in the match
-  if (need === 'granny' || (need && need.granny)) { if (!grannyReady() || !spiderOk() || !grandpaReady() || !slendrinaReady()) { loading(true, 'Granny is coming down the stairs…'); await Promise.race([Promise.all([loadGranny(), loadGrandpa(), loadSpiderMom(), loadSlendrina()]), new Promise(r => setTimeout(r, 25000))]); } }
+  if (need === 'granny' || (need && need.granny)) { if (!grannyReady() || !spiderOk() || !grandpaReady() || !slendrinaReady() || !angelineReady()) { loading(true, 'Granny is coming down the stairs…'); await Promise.race([Promise.all([loadGranny(), loadGrandpa(), loadSpiderMom(), loadSlendrina(), loadAngeline()]), new Promise(r => setTimeout(r, 25000))]); } }
   if (need && need.granny) need = need.chucky;
   if (!need || (chuckyReady() && slappyReady())) return;
   loading(true, "Waking Chucky up…");
@@ -1524,9 +1525,9 @@ const AN_GRANNY = `<div class="an-bg granny"></div><div class="an-inner">
   <div class="an-banner"><div class="an-img granny-art"></div><div class="an-scan"></div></div>
   <div class="an-x">× <span>DBD</span></div>
   <p class="an-sub">You wake up in her house. Four survivors, seven generators, two exit gates and one Granny. She hears every creak of the floorboards, appears at any generator or hook she likes, <b>Spider Mom</b> crawls the generators looking for you, and Granny can switch bodies with her in an instant. Grandpa takes the shift with his shotgun, and Slendrina comes up from the cellar.</p>
-  <ul class="an-list"><li>Killers: <b>Granny</b> (Bat Rush, I Hear You, Creep, Body Swap), <b>Grandpa</b> (Shotgun, Bear Traps), <b>Slendrina</b> (Haunt, Cursed Gaze)</li><li>Survivors: <b>Mara, Eli, June, Tomás</b></li><li>Maps: <b>Granny's House</b>, <b>Granny's Old House</b> · bots or online with friends</li></ul>
+  <ul class="an-list"><li>Killers: <b>Granny</b> (Bat Rush, I Hear You, Creep, Body Swap), <b>Grandpa</b> (Shotgun, Bear Traps), <b>Slendrina</b> (Haunt, Cursed Gaze), <b>Angeline</b> (Yellow Eyes, Lullaby)</li><li>Survivors: <b>Mara, Eli, June, Tomás</b></li><li>Maps: <b>Granny's House</b>, <b>Granny's Old House</b> · bots or online with friends</li></ul>
   <div class="an-actions"><button class="btn primary big" id="an-play">Play as Survivor</button><button class="btn big" id="an-store">Play as Granny</button><button class="btn" id="an-trailer">Watch Trailer</button><button class="btn" id="an-close">Close</button></div>
-  <p class="gb-note">Fan-made. Granny, Grandpa, Slendrina and Spider Mom are characters by DVloper; Dead by Daylight is by Behaviour Interactive. Not affiliated with or endorsed by either.</p></div>`;
+  <p class="gb-note">Fan-made. Granny, Grandpa, Slendrina, Angeline and Spider Mom are characters by DVloper; Dead by Daylight is by Behaviour Interactive. Not affiliated with or endorsed by either.</p></div>`;
 function showAnnounce(kind = 'offal') {
   closePanel();
   const A = $('announce'); A.innerHTML = kind === 'gb' ? AN_GB : kind === 'granny' ? AN_GRANNY : AN_OFFAL; A.classList.remove('hidden');

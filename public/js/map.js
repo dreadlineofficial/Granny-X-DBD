@@ -732,6 +732,24 @@ export function losL(M, a, b, minH) {
   return losBlocked(L, a.x, a.z, b.x, b.z, minH);
 }
 // a map-like object for one extra level: collision boxes, a hash and a walking grid
+// does this upper floor (Granny's House) really have floor under (x, z)? (the ground and the stairs always do)
+export function floorUnder(M, fl, x, z) {
+  const F = M.floorSupport;
+  if (!F || !fl || fl >= 10) return true;
+  const rows = F.floors[fl]; if (!rows) return true;
+  const j = Math.floor((z - F.Z0) / F.CELL), i = Math.floor((x - F.X0) / F.CELL), r = rows[j];
+  if (!r) return false;
+  for (let k = 0; k < r.length; k += 2) if (i >= r[k] && i < r[k] + r[k + 1]) return true;
+  return false;
+}
+// stepped off the edge of an upper floor: down to the highest floor below that is there (or the ground)
+export function dropFloor(M, p) {
+  const fl = p.fl || 0;
+  if (!M.floorSupport || !fl || fl >= 10 || floorUnder(M, fl, p.x, p.z)) return false;
+  let f = fl - 1; while (f > 0 && !floorUnder(M, f, p.x, p.z)) f--;
+  p.fl = f; p.sp = undefined;
+  return true;
+}
 export function makeLevel(M, boxes, circles = []) {
   const L = { half: M.half, navR: M.navR, boxes, circles, windows: [], bars: [], gens: [], cages: [], gates: [], level: true };
   buildGrid(L);

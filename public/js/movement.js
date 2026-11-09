@@ -1,5 +1,5 @@
 // Character movement: used for the local player (on any machine) and for bots (on the host).
-import { moveCircle, levelOf, levelStep, spiralClamp } from './map.js';
+import { moveCircle, levelOf, levelStep, spiralClamp, dropFloor } from './map.js';
 import { speedOf, fwd, angDiff } from './rules.js';
 import { HALF } from './config.js';
 
@@ -50,7 +50,7 @@ export function stepMover(M, S, p, intent, dt) {
   p.bump = sp > 6 && dt > 0 && moved < sp * dt * 0.3;
   const ox = p.x, oz = p.z;
   p.x = res.x; p.z = res.z;
-  if (M.stairs) { if ((p.fl || 0) >= 10) spiralClamp(M, p, ox, oz); levelStep(M, p); }
+  if (M.stairs) { if ((p.fl || 0) >= 10) spiralClamp(M, p, ox, oz); levelStep(M, p); if (dropFloor(M, p)) p.fell = (p.fell || 0) + 1; }
   const v = dt > 0 ? moved / dt : 0;
   p.mv = v > 3.0 ? 2 : v > 0.25 ? 1 : 0;
   p.cr = intent.crouch && p.role === 'survivor' ? 1 : 0;

@@ -1,6 +1,6 @@
 // Authoritative game simulation. Runs only on the host (or in single-player).
 import { RULES, KILLERS, SURVIVORS, POSSESS_MAX, POWER_LV, powerReach, SPEED, DIFFICULTY, HALF, MODES, INFECT_POOL, SURV_PERKS, PERK_SLOTS, ITEMS } from './config.js';
-import { barBox, losBlocked, moveCircle, findPath, cellOf, cellPos, levelOf, levelsMeet, losL, heightAt, levelStep, overlaps } from './map.js';
+import { barBox, losBlocked, moveCircle, findPath, cellOf, cellPos, levelOf, levelsMeet, losL, heightAt, levelStep, overlaps, floorUnder } from './map.js';
 import {
   has, fwd, dist, killerOf, killersOf, nearestKiller, anyKillerHas, playerById, findInteraction, actionTime, terrorRadius, inExit, findSpace, vaultDuration, findExecute, angDiff,
 } from './rules.js';
@@ -73,7 +73,7 @@ export class Sim {
         item: mode === 'bloodmoon' && r.role === 'survivor' ? 'taser' : 'flashlight', flash: r.role === 'survivor' && mode !== 'bloodmoon' ? RULES.flashBattery * (mode === 'dark' ? 0.5 : 1) : 0, traps: false ? (r.char === 'raghuvir' || r.char === 'abeer' ? 3 : 2) + ((r.perks || []).includes('containment') ? 1 : 0) : 0, flashOn: false, glare: 0, blind: 0, blindImm: 0, tasers: mode === 'bloodmoon' && r.role === 'survivor' ? 2 : 0, zap: 0, spied: 0, fl: 0, sp: 0, reach: r.role === 'killer' && POWER_LV[r.char] ? (r.char === 'granny' && r.og ? 999 : powerReach(r.char, r.lv)) : 0, og: r.char === 'granny' && !!r.og, heard: 0, webbed: 0, webs: r.role === 'survivor' && r.char === 'spiderman' ? SURVIVORS.spiderman.web.shots : 0, webK: 0, dash: null, swapCd: 0,
         score: { a: 0, b: 0, c: 0, d: 0 }, outcome: '', diffMul: r.role === 'killer' && r.bot ? this.diff.killerSpeed : 1,
         possCd: 0, disguise: false, harmless: false, pdowns: 0, pcages: 0, noCage: false, split: false,
-        pet: '', gaze: 0, curse: 0, cursed: 0, doomed: 0,
+        pet: '', gaze: 0, curse: 0, cursed: 0, doomed: 0, spotT: 0, spotted: 0, drowsy: 0, inBeam: false,
       });
     }
   }
@@ -99,7 +99,7 @@ export class Sim {
           p.x = nx; p.z = nz;
           // floors (Granny's House): the player's own idea of which floor they are on, if it's one
           // they could have stepped to from the floor the host has them on
-          if (M.stairs && typeof m.fl === 'number') { const nf = m.fl | 0; if (nf === (p.fl || 0) || levelsMeet(p, { fl: nf })) { p.fl = nf; if (typeof m.sp === 'number') p.sp = m.sp; } }
+          if (M.stairs && typeof m.fl === 'number') { const nf = m.fl | 0, fell = nf < (p.fl || 0) && (p.fl || 0) < 10 && !floorUnder(M, p.fl, nx, nz); if (nf === (p.fl || 0) || levelsMeet(p, { fl: nf }) || fell) { p.fl = nf; if (typeof m.sp === 'number') p.sp = m.sp; } }
         }
         else p.tp++;
         p.posT = S.t;
@@ -118,6 +118,12 @@ export class Sim {
         if (p.role === 'killer' && p.char === 'bateman') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && p.ammo > 0 && p.carry == null && !p.act && p.stun <= 0 && !p.atk; if (p.aim && !was) p.abT = 0; }
         if (p.role === 'killer' && p.char === 'granny') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && !p.dash && p.carry == null && !p.act && p.stun <= 0 && !p.atk && !p.tele && p.ab !== 1; if (p.aim && !was) p.abT = 0; }
         if (p.role === 'killer' && p.char === 'grandpa') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && p.carry == null && !p.act && p.stun <= 0 && !p.atk && !p.tele; if (p.aim && !was) p.abT = 0; }
+        if (p.role === 'killer' && p.char === 'angeline') {
+          // Yellow Eyes: on while held (up to 4s); letting go starts the cooldown
+          const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && p.carry == null && !p.act && p.stun <= 0 && !p.atk && !p.tele;
+          if (p.aim && !was) { p.abT = 0; this.ev({ k: 'beam', id: p.id, on: true }); }
+          if (was && !p.aim) { p.abCd = KILLERS.angeline.ability.cooldown * Math.max(0.35, Math.min(1, p.abT / KILLERS.angeline.ability.max)); this.ev({ k: 'beam', id: p.id, on: false }); }
+        }
         if (p.role === 'killer' && p.char === 'slendrina') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && p.carry == null && !p.act && p.stun <= 0 && !p.atk && !p.tele && (p.fl || 0) < 10; if (p.aim && !was) p.abT = 0; }
         if (p.role === 'killer' && p.char === 'chucky') { const was = p.aim; p.aim = !!m.aim && p.abCd <= 0 && !p.leap && p.carry == null && !p.act && p.stun <= 0 && !p.atk; if (p.aim && !was) p.abT = 0; }
         break;
@@ -441,6 +447,13 @@ export class Sim {
           p.ab2Cd = D.cooldown;
           this.ev({ k: 'bearset', id: p.id, x: spot.x, z: spot.z });
         }
+        if (p.role === 'killer' && p.char === 'angeline' && p.ab2Cd <= 0 && !p.act && p.stun <= 0) {
+          // Lullaby: everyone close enough to hear her turns drowsy
+          const D = KILLERS.angeline.ability2, ids = [];
+          for (const s of S.players) if (s.role === 'survivor' && s.st === 'ok' && levelsMeet(p, s) && dist(p, s) < D.radius) { s.drowsy = D.time; s.reveal = Math.max(s.reveal, 1.5); ids.push(s.id); }
+          p.ab2Cd = D.cooldown; p.score.b += ids.length * 100;
+          this.ev({ k: 'lullaby', id: p.id, x: p.x, z: p.z, ids });
+        }
         if (p.role === 'killer' && p.char === 'slendrina' && p.ab2Cd <= 0 && !(p.gaze > 0) && !p.act && p.stun <= 0) {
           p.gaze = KILLERS.slendrina.ability2.duration;
           this.ev({ k: 'gaze', id: p.id, x: p.x, z: p.z, on: true });
@@ -696,6 +709,7 @@ export class Sim {
     this.updateGranny(dt);
     this.updateGrandpa(dt);
     this.updateSlendrina(dt);
+    this.updateAngeline(dt);
 
     // ---- survivor states ----
     for (const p of S.players) {
@@ -1002,6 +1016,7 @@ export class Sim {
     s.act = null; s.prog = 0;
     if (K && K.char === 'granny' && s.heard > 0) { instantDown = true; s.heard = 0; }
     if (K && K.char === 'slendrina' && s.doomed > 0) { instantDown = true; s.doomed = 0; s.curse = 0; }
+    if (K && K.char === 'angeline' && s.spotted > 0) { instantDown = true; s.spotted = 0; s.spotT = 0; }
     if (this.mode === 'glass') instantDown = true; // Glass Bones: every hit downs
     if (K && K.disguise) (s.knows ||= {})[K.id] = true; // hit by the 'survivor' Chucky is wearing: now they know // I Hear You: she knew exactly where you were
     const wasHp = s.hp;
@@ -1588,6 +1603,30 @@ export class Sim {
           s.curse = Math.min(G.need, (s.curse || 0) + dt);
           if (s.curse >= G.need && !(s.doomed > 0)) { s.doomed = 20; this.ev({ k: 'doomed', id: s.id, by: K.id }); }
         }
+      }
+    }
+  }
+  // Angeline: Yellow Eyes (a beam from her eyes: half a second in it and you are Spotted); drowsiness from her Lullaby
+  updateAngeline(dt) {
+    const S = this.S, M = this.M, A = KILLERS.angeline.ability;
+    for (const s of S.players) if (s.role === 'survivor') {
+      if (s.drowsy > 0) { s.drowsy = Math.max(0, s.drowsy - dt); if (s.st !== 'ok') s.drowsy = 0; }
+      if (s.spotted > 0) { s.spotted = Math.max(0, s.spotted - dt); if (s.st !== 'ok') s.spotted = 0; else s.reveal = Math.max(s.reveal, 0.3); }
+      if (s.spotT > 0 && !s.inBeam) s.spotT = Math.max(0, s.spotT - dt * 0.6);
+      s.inBeam = false;
+    }
+    for (const K of S.players) {
+      if (K.role !== 'killer' || K.char !== 'angeline' || !K.aim) continue;
+      K.abT += dt;
+      if (K.abT >= A.max || K.stun > 0 || K.carry != null || K.act) { K.aim = false; K.abCd = A.cooldown; this.ev({ k: 'beam', id: K.id, on: false }); continue; }
+      const f = fwd(K.yaw);
+      for (const s of S.players) {
+        if (s.role !== 'survivor' || s.st !== 'ok' || !levelsMeet(K, s)) continue;
+        const dx = s.x - K.x, dz = s.z - K.z, d = Math.hypot(dx, dz);
+        if (d > A.range || d < 0.2) continue;
+        if (Math.abs(angDiff(K.yaw, Math.atan2(dx, dz))) > A.cone + 0.35 / d || losL(M, K, s, 1.2)) continue;
+        s.inBeam = true; s.spotT = (s.spotT || 0) + dt;
+        if (s.spotT >= A.need && !(s.spotted > 0)) { s.spotted = A.spotted; s.reveal = Math.max(s.reveal, A.reveal); K.score.b += 150; this.ev({ k: 'spotted', id: s.id, by: K.id }); }
       }
     }
   }

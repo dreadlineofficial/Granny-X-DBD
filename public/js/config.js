@@ -164,6 +164,15 @@ export const KILLERS = {
     feature: { name: 'Ghost', desc: 'She floats: silent, with a 24m terror radius. Played over the shoulder.' },
     color: 0x9aa6a0,
   },
+  angeline: {
+    id: 'angeline', name: 'Angeline', speed: 4.6, terror: 30, weapon: 'Claws', crossover: 'Granny (fan-made)', tpv: true,
+    lore: '',
+    exec: { name: 'Hush Now', desc: 'Holds the survivor close, sings to them, and does not let go.' },
+    ability: { name: 'Yellow Eyes', cooldown: 12, max: 4, range: 16, cone: 0.21, need: 0.5, reveal: 8, spotted: 15, slow: 0.6, desc: 'Hold RMB to shine the yellow light of her eyes ahead of her (up to 4s, 16m, blocked by walls; she moves slower). A survivor caught in it for half a second is Spotted: revealed for 8s, and her next hit puts them straight down for 15s.' },
+    ability2: { name: 'Lullaby', key: 'R', cooldown: 30, radius: 30, time: 5, slow: 0.75, desc: 'She hums. Every survivor within 30m turns drowsy for 5s: they cannot run, they slow down, and their vision blurs.' },
+    feature: { name: 'Slendrina\'s Mother', desc: 'She watches over the house: survivors she has Spotted show up to her on the whole map while it lasts.' },
+    color: 0xd8c040,
+  },
   bateman: {
     id: 'bateman', name: 'Patrick Bateman', speed: 4.7, terror: 28, weapon: 'Axe', crossover: 'American Psycho (fan-made)',
     lore: '',
@@ -338,6 +347,10 @@ export const SKINS = {
     { id: 'default', name: 'The Cellar', price: 0, desc: 'Her torn white dress, her long black hair, and those eyes.' },
     { id: 'pale', name: 'Pale Lady', price: 0, tint: 0xd8e4f0, tintK: 0.45, glow: 0x6a8aa8, glowK: 0.3, desc: 'Even paler, glowing faintly in the dark.' },
   ],
+  angeline: [
+    { id: 'default', name: 'Mother', price: 0, desc: 'Her black dress, her long hair, and the yellow light in her eyes.' },
+    { id: 'pale', name: 'Ghost Mother', price: 0, tint: 0xd8e4f0, tintK: 0.4, glow: 0x8a9a6a, glowK: 0.25, desc: 'Faded, glowing faintly, like the photo on the cellar wall.' },
+  ],
   bateman: [
     { id: 'default', name: 'Pierce & Pierce', price: 0, desc: 'Charcoal pinstripe double-breasted suit, crisp white shirt, red silk tie and a cigar. Valentino Couture.' },
     { id: 'raincoat', name: 'Hip to Be Square', price: 2500, rain: true, desc: 'A clear plastic raincoat over the suit, for the mess. Newspaper on the floor optional.' },
@@ -362,13 +375,24 @@ export const skinOf = (char, id) => (SKINS[char] || []).find(s => s.id === id) |
 // ---------------- Inbox: version notes & gifts ----------------
 // email updates: the Buttondown newsletter's username (empty: the option stays hidden)
 export const NEWSLETTER = '';
-// Granny x DBD: three killers (Granny, Grandpa, Slendrina) and the four original survivors
-export const PLAY_K = ['granny', 'grandpa', 'slendrina'], PLAY_S = ['mara', 'eli', 'june', 'tomas'];
+// Granny x DBD: four killers (Granny, Grandpa, Slendrina, Angeline) and the four original survivors
+export const PLAY_K = ['granny', 'grandpa', 'slendrina', 'angeline'], PLAY_S = ['mara', 'eli', 'june', 'tomas'];
 export const playable = c => PLAY_K.includes(c) || PLAY_S.includes(c);
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 // Inbox entries with `email: true` are big updates: they are emailed to newsletter subscribers
 // automatically (tools/email-updates.mjs). Small tweaks leave it out and are never mailed.
 export const INBOX = [
+  {
+    id: 'gdbd13', version: '1.3.0', date: 'Nov 2026', title: 'Angeline arrives', tag: 'Update',
+    gift: { embers: 1500, label: 'Update gift: 1,500 Embers' },
+    body: [
+      "New killer: Angeline, Slendrina's mother. Yellow Eyes (a beam that Spots you: one hit downs) and Lullaby (nobody near her can run).",
+      "Granny's House: the floors no longer have pieces floating in the air.",
+      'Better graphics and a new loading screen.',
+      "Grandpa's bear traps now use the real Granny bear trap, and snap shut on you.",
+      'Online: public lobbies anyone can join from the lobby list, or private ones with a code.',
+    ],
+  },
   {
     id: 'gdbd12', version: '1.2.0', date: 'Nov 2026', title: "Into Granny's Old House", tag: 'Update',
     gift: { embers: 1000, label: 'Update gift: 1,000 Embers' },

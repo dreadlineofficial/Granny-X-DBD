@@ -83,6 +83,7 @@ const I = {
   exorcist: `<circle cx="32" cy="26" r="14"/><path d="M26 22h12M32 16v20"/><path d="M18 52c4-8 24-8 28 0"/>`,
   shotgun: `<path d="M6 34h30l4-4h18v6H40l-4 4H22l-4 12h-8l3-12H6z"/><path d="M40 30v-4h14"/>`,
   gaze: `<path d="M4 32c8-12 17-18 28-18s20 6 28 18c-8 12-17 18-28 18S12 44 4 32z"/><circle cx="32" cy="32" r="9"/><path d="M32 23v18M23 32h18" stroke-width="2"/>`,
+  eyes: `<path d="M4 32c8-11 17-16 28-16s20 5 28 16c-8 11-17 16-28 16S12 43 4 32z"/><circle cx="32" cy="32" r="8"/><path d="M40 32h20M46 26l14 6-14 6" stroke-width="2"/>`,
   card: `<rect x="10" y="18" width="44" height="28" rx="2"/><path d="M18 28h16"/><path d="M18 35h28"/><path d="M18 40h20"/>`,
 };
 
@@ -91,4 +92,4 @@ export function icon(name, cls = '') {
   return `<svg class="ico ${cls}" viewBox="0 0 64 64" ${S} aria-hidden="true">${body}</svg>`;
 }
 export const STATE_ICON = { healthy: 'healthy', injured: 'injured', down: 'down', carried: 'carried', caged: 'caged', dead: 'dead', out: 'out', exec: 'exec' };
-export const POWER_ICON = { butcher: 'rampage', wisp: 'fade', harrower: 'spear', lamplighter: 'lantern', foreman: 'hook', slimer: 'fade', bateman: 'chainsaw', chucky: 'knife', granny: 'beartrap', grandpa: 'shotgun', slendrina: 'gaze' };
+export const POWER_ICON = { butcher: 'rampage', wisp: 'fade', harrower: 'spear', lamplighter: 'lantern', foreman: 'hook', slimer: 'fade', bateman: 'chainsaw', chucky: 'knife', granny: 'beartrap', grandpa: 'shotgun', slendrina: 'gaze', angeline: 'eyes' };
