@@ -25,7 +25,10 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
   - `map.js` + `grannyhouse.js` / `grannygrid.js` the house map (multi-floor levels + stairs, `heightAt`, `levelOf`).
     `buildMap(seed, map)`: `granny1` = Granny's Old House: `buildArena` (5x5 woods cells, ring pushed out by
     `HOUSE1.xs/zs`) with the Granny 1 house (`granny1_map.glb`, converted from the owner's USDZ, underground
-    parts dropped) as one solid landmark; its collision is `granny1grid.js` (measured from the model, insides filled).
+    parts dropped). Since 1.2 its ground floor (hall, kitchen, living room, ~150 m2) is walkable through the front
+    door (door + locks removed from the model and collision); the rest of the plot stays solid. Collision is
+    `granny1grid.js` (measured from the model, no wall thickening so inside doorways stay open; navR 0.24 on this
+    map). One generator is placed inside at build time by `placeHouseGen` (deepest spot reachable from the door).
   - `game.js` rendering/input/HUD per frame; `models.js` + `*Glb.js` character models; `world.js` scene.
   - `net.js` online (MQTT relay + self-signalled WebRTC), `snap.js` snapshots, `friends.js`, `awards.js`.
   - `loadscreen.js` the 3D loading screen (Granny walking a 22 s loop, Spider Mom, flickering lamps, tips).
@@ -41,7 +44,7 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
 
 ## Identity / namespacing (keep separate from Nightbound)
 - localStorage prefix `gdbd_` (e.g. `gdbd_settings`, `gdbd_profile`).
-- Relay topics `grannydbd/v1/...`, PeerJS prefix `grannydbd-v1-`. `NET_PROTOCOL = 11`, `VERSION = '1.1.0'` (config.js).
+- Relay topics `grannydbd/v1/...`, PeerJS prefix `grannydbd-v1-`. `NET_PROTOCOL = 11`, `VERSION = '1.2.0'` (config.js).
 - Electron appId `io.github.froodyofficial.grannyxdbd`. The APK signing keystore (`release.jks`,
   alias `grannyxdbd`) is NOT in the repo: the owner keeps it. Put it in `tools/android/` and set
   `KS_PASS` before building; always sign with the same key so updates install over old versions.
@@ -56,8 +59,8 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
 - Skins: price-0 skins count as owned. `window.__THREE`, `window.__killerSkin`, `window.__cine`
   (film-camera hook called in game.js after updateCamera) exist for trailer capture.
 - `game.touch` bypasses pointer lock (touch devices).
-- Grandpa (`grandpa`): shotgun (RMB hold/release, act `rush` -> `sim.shotgun`, survivors' `shp` bar, 2 long shots
-  down), Bear Trap (R, `S.bears`, `snare`). Model = grandpa.glb via `makeGrannyGlb({grandpa:true})`; his body/gun
+- Grandpa (`grandpa`): shotgun (RMB hold/release, act `rush` -> `sim.shotgun`, survivors' `shp` bar: 34 dmg at <=2m
+  to 75 at >=14m, so 2 shots down from mid range, 3 point-blank; each hit staggers (boost 0.9s at x0.6 speed)), Bear Trap (R, `S.bears`, `snare`). Model = grandpa.glb via `makeGrannyGlb({grandpa:true})`; his body/gun
   materials are brightened in `AnimRig.material` (the file darkens them to 30%).
 - Slendrina (`slendrina`, third person): Haunt (RMB hold shows a ground marker, act `haunt` with x/z ->
   `reachableSpot`, `tele.h`), Cursed Gaze (R, `gaze` timer; survivors looking at her get `cursed`/`curse`,
@@ -65,6 +68,10 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
 - Bot watchdogs (bots.js): a survivor still for 2.5s avoids that goal 15s (`b.avoid`), a killer still for 3s
   drops its target/patrol and avoids unreachable hooks/downed (`b.kAvoid`). Carrying killers path round
   dropped pallets; killers avoid one-cell gaps (`grid.narrow`).
+- Smarter bots (1.2): survivors treat Grandpa aiming at them (32m, in sight) as a threat and zig-zag (`b.juke`),
+  flee Slendrina's gaze and her haunt arrivals, remember ~60% of the traps they see (`b.traps`), and break sideways
+  when cornered (`b.cornerT`). Killers weight targets (snared, doomed, heard, low shp); Grandpa strafes at mid range
+  while the gun cycles.
 - Headless bot-only matches (Sim + Bots, no rendering) run ~10 game minutes per second: useful to find stalls.
 
 ## Build
@@ -114,5 +121,7 @@ Granny-only roster and house map; Grandpa outfit; 3D loading screen; load freeze
 APK with touch controls; smarter bots (no stalls); Game Jolt header/thumbnail/page text using the
 owner's GRANNY and DBD logos (no line under them); a 57 s YouTube trailer (v2: tense synthesized
 score, re-shot scenes) and a 17 s vertical YouTube Short with a "SHE HEARD YOU." thumbnail.
+1.2: Granny's Old House enterable, stronger shotgun, taller Slendrina (1.95m), smarter bots, YouTube Short #2
+("SHE'S NOT ALONE ANYMORE.", rendered in-engine, synthesized score).
 1.1: Grandpa as his own killer, Slendrina, Granny's Old House, bot stall fixes, portable Windows exe,
 devlog thumbnail (rendered in-engine: the three killers at the Granny 1 house's front door).

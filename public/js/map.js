@@ -4,7 +4,7 @@ import { HALF } from './config.js';
 import { buildMeatworks } from './meatworks.js';
 import { buildGrannyHouse } from './grannyhouse.js';
 import { THEMES, BIG_MAPS } from './themes.js';
-import { HOUSE1_BOXES, HOUSE1_FOOT } from './granny1grid.js';
+import { HOUSE1_BOXES, HOUSE1_FOOT, HOUSE1_GEN } from './granny1grid.js';
 
 export function rng(seed) {
   let a = seed >>> 0;
@@ -144,7 +144,7 @@ function buildArena(seed, map) {
   };
   if (H) {
     // the house: its own model draws it; these boxes are its walls (see granny1grid.js)
-    M.glbScene = H.glb; M.isIndoors = H.foot;
+    M.glbScene = H.glb; M.isIndoors = H.foot; M.navR = 0.24; // (doorways in the house)
     for (const [x, z, hx, hz] of HOUSE1_BOXES) M.boxes.push({ x, z, hx, hz, h: 4, kind: 'mesh', style: 'none', nocast: true });
   }
   const theme = TH ? TH.style : H ? 'wood' : R.pick(['brick', 'wood', 'stone']);
@@ -264,6 +264,8 @@ function buildArena(seed, map) {
     M.gens.push({ id: M.gens.length, x, z, rot: R.int(0, 3) * Math.PI / 2 });
     M.boxes.push({ x, z, hx: 0.62, hz: 0.62, h: 1.25, kind: 'gen', style: 'metal', nocast: true });
   }
+  // the house map: one of the generators goes in the house (placed once the walking grid is known, below)
+  const houseGen = H && M.gens.length ? M.gens[M.gens.length - 1] : null;
   // cages: 7 spread-out cells (prefer cells without a gen)
   const cagePool = R.shuffle(cells.filter(c => c.C));
   cagePool.sort((a, b) => (genCells.includes(a) ? 1 : 0) - (genCells.includes(b) ? 1 : 0));
@@ -329,11 +331,40 @@ function buildArena(seed, map) {
   }
   if (TH && TH.extra) TH.extra(M, R, cells, near);
 
+  if (houseGen) placeHouseGen(M, houseGen);
   buildGrid(M);
   return M;
 }
 
 function push(M, c) { M.circles.push(c); return c; }
+// Granny's Old House: the house's generator stands as deep inside the ground floor as it can while it can still be
+// walked to from the front door (on the bots' walking grid) and has room all round it
+function placeHouseGen(M, g) {
+  const b = M.boxes.find(o => o.kind === 'gen' && o.x === g.x && o.z === g.z);
+  if (b) M.boxes.splice(M.boxes.indexOf(b), 1);
+  M.hash = null; buildGrid(M);
+  const G = M.grid, N = G.N, seen = new Uint8Array(N * N), q = [cellOf(M, 3.35, 17.5)];
+  seen[q[0]] = 1;
+  while (q.length) {
+    const k = q.pop(), i = k % N, j = (k / N) | 0;
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ni = i + di, nj = j + dj; if (ni < 0 || nj < 0 || ni >= N || nj >= N) continue;
+      const nk = nj * N + ni; if (!seen[nk] && G.type[nk] !== 1) { seen[nk] = 1; q.push(nk); }
+    }
+  }
+  let best = null, bs = -1;
+  for (let x = -5.5; x < 12.4; x += 0.25) for (let z = 4.2; z < 15.2; z += 0.25) {
+    if (!seen[cellOf(M, x, z)] || overlaps(M, x, z, 1.3)) continue;
+    // every side of it reachable too (somewhere to stand and repair)
+    if (![[1.05, 0], [-1.05, 0], [0, 1.05], [0, -1.05]].every(([dx, dz]) => seen[cellOf(M, x + dx, z + dz)])) continue;
+    const sc = Math.hypot(x - 3.35, z - 15.8);
+    if (sc > bs) { bs = sc; best = { x, z }; }
+  }
+  const at = best || HOUSE1_GEN;
+  g.x = at.x; g.z = at.z; g.rot = 0;
+  M.boxes.push({ x: g.x, z: g.z, hx: 0.62, hz: 0.62, h: 1.25, kind: 'gen', style: 'metal', nocast: true });
+  M.hash = null;
+}
 
 export function addGates(M, gateDefs, style = 'stone') {
   for (const g of gateDefs) {

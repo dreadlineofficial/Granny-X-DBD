@@ -149,8 +149,8 @@ export const KILLERS = {
     lore: '',
     exec: { name: 'Last Round', desc: 'Pins the survivor to the floor with his boot and takes his time reloading.' },
     // survivors carry a second health bar against him (100): the farther the shot, the more it takes
-    shotgun: { name: 'Shotgun', cooldown: 2.0, raise: 0.3, range: 45, minDmg: 25, maxDmg: 60, near: 2, far: 16, reveal: 5 },
-    ability: { name: 'Shotgun', cooldown: 2.0, desc: 'Hold RMB to raise the shotgun (slowed), release to fire. Survivors carry a second health bar against him: two long-range shots put anyone down, up close it takes four. Everyone he hits is revealed for 5s.' },
+    shotgun: { name: 'Shotgun', cooldown: 2.0, raise: 0.3, range: 45, minDmg: 34, maxDmg: 75, near: 2, far: 14, reveal: 5, stagger: 0.9, slow: 0.6 },
+    ability: { name: 'Shotgun', cooldown: 2.0, desc: 'Hold RMB to raise the shotgun (slowed), release to fire. Survivors carry a second health bar against him: two shots put anyone down from mid range or farther, three point-blank. Every hit staggers them (slowed for a moment) and reveals them for 5s.' },
     ability2: { name: 'Bear Trap', key: 'R', cooldown: 5, max: 3, snare: 4, reveal: 6, seen: 5, desc: 'Set a bear trap where you stand (up to 3: setting a 4th removes the oldest). A survivor who steps in is injured, caught for 4s and revealed for 6s. Survivors only spot a trap from 5m away.' },
     feature: { name: 'Old Soldier', desc: 'He takes his time, and he never misses twice: his shots hit hardest from far away, and his traps guard the generators he cannot watch.' },
     color: 0x8a7a5a,
@@ -365,15 +365,25 @@ export const NEWSLETTER = '';
 // Granny x DBD: three killers (Granny, Grandpa, Slendrina) and the four original survivors
 export const PLAY_K = ['granny', 'grandpa', 'slendrina'], PLAY_S = ['mara', 'eli', 'june', 'tomas'];
 export const playable = c => PLAY_K.includes(c) || PLAY_S.includes(c);
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 // Inbox entries with `email: true` are big updates: they are emailed to newsletter subscribers
 // automatically (tools/email-updates.mjs). Small tweaks leave it out and are never mailed.
 export const INBOX = [
   {
+    id: 'gdbd12', version: '1.2.0', date: 'Nov 2026', title: "Into Granny's Old House", tag: 'Update',
+    gift: { embers: 1000, label: 'Update gift: 1,000 Embers' },
+    body: [
+      "Granny's Old House is open: walk in through the front door. Hall, kitchen, living room, and a generator inside.",
+      "Grandpa's shotgun hits harder: two shots put anyone down from mid range on, three point-blank, and every hit staggers.",
+      'Slendrina is taller.',
+      "Smarter bots: survivors dodge Grandpa's aim, look away from Slendrina and remember the traps they've seen; killers pick their targets better and Grandpa keeps his distance.",
+    ],
+  },
+  {
     id: 'gdbd11', version: '1.1.0', date: 'Nov 2026', title: 'Grandpa, Slendrina and a new map', tag: 'Update',
     gift: { embers: 1500, label: 'Update gift: 1,500 Embers' },
     body: [
-      'Grandpa is his own killer now: a stronger shotgun (two long-range shots put anyone down) and bear traps.',
+      'Grandpa is his own killer now: a stronger shotgun (two shots put anyone down, every hit staggers) and bear traps.',
       'New killer: Slendrina. Haunt (vanish and reappear up to 16m away, through walls) and Cursed Gaze (look at her and pay for it).',
       "New map: Granny's Old House. Her first house, out in the woods.",
       'Smarter bots: they no longer stand around stuck at generators, chests, hooks or pallets.',

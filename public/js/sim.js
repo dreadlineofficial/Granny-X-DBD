@@ -1624,7 +1624,7 @@ export class Sim {
       best.lastHitBy = K.id; K.score.a += 50 + dmg * 4;
       best.reveal = Math.max(best.reveal, G.reveal);
       if (best.shp <= 0) { best.shp = 100; this.damage(best, K, true); }
-      else { best.boost = 0.8; best.boostMul = SPEED.hitBoost; best.act = null; best.prog = 0; }
+      else { best.boost = G.stagger; best.boostMul = G.slow; best.act = null; best.prog = 0; } // staggered: slowed for a moment
     }
     this.ev({ k: 'shot', id: K.id, x: K.x, z: K.z, ex: +ex.toFixed(2), ez: +ez.toFixed(2), to: best ? best.id : null, dmg, d: best ? +bd.toFixed(1) : 0 });
   }

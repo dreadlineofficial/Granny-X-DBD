@@ -298,9 +298,16 @@ export class Bots {
       const t = playerById(S, b.target);
       if (t) p.yaw += Math.max(-1.1 * dt, Math.min(1.1 * dt, angDiff(p.yaw, Math.atan2(t.x - p.x, t.z - p.z))));
     }
+    if (p.role === 'survivor' && b.juke && m > 0.05) { const a = Math.sin(S.t * 4.2 + p.id.length) * 0.75, c = Math.cos(a), sn = Math.sin(a); [mx, mz] = [mx * c - mz * sn, mx * sn + mz * c]; }
     if (p.role === 'survivor' && S.bears && S.bears.length && m > 0.05) {
       // (running for their life, they often don't look down)
-      for (const t of S.bears) { const dx = p.x - t.x, dz = p.z - t.z, d = Math.hypot(dx, dz); if (sprint && ((t.id * 7 + p.id.charCodeAt(p.id.length - 1)) % 10) < 6) continue; if (d < 1.5 && d > 0.01 && (t.fl || 0) === (p.fl || 0)) { const k = (1.5 - d) / 1.5 * 1.8; mx += dx / d * k; mz += dz / d * k; } }
+      // a trap we have spotted gets a wide berth; one we haven't, we may not see in time when running
+      for (const t of S.bears) {
+        const known = b.traps && b.traps.has(t.id), R0 = known ? 2.1 : 1.5;
+        if (!known && sprint && ((t.id * 7 + p.id.charCodeAt(p.id.length - 1)) % 10) < 6) continue;
+        const dx = p.x - t.x, dz = p.z - t.z, d = Math.hypot(dx, dz);
+        if (d < R0 && d > 0.01 && (t.fl || 0) === (p.fl || 0)) { const k = (R0 - d) / R0 * (known ? 2.4 : 1.8); mx += dx / d * k; mz += dz / d * k; }
+      }
       const m2 = Math.hypot(mx, mz); if (m2 > 1) { mx /= m2; mz /= m2; }
     }
     stepMover(M, S, p, { mx, mz, sprint, crouch: b.crouch }, dt);
@@ -349,6 +356,7 @@ export class Bots {
       }
     }
     const avoid = (mode, id) => !!(b.avoid && b.avoid[mode + ':' + id] > S.t);
+    if (S.bears && S.bears.length) { const seen = KILLERS.grandpa.ability2.seen; b.traps ||= new Set(); for (const t of S.bears) if (!b.traps.has(t.id) && ((t.id * 13 + p.id.charCodeAt(p.id.length - 1)) % 10) < 6 && Math.hypot(t.x - p.x, t.z - p.z) < seen && !losBlocked(M, p.x, p.z, t.x, t.z, 0.5)) b.traps.add(t.id); } // (they don't spot every one)
 
     // awareness of the killer
     let threat = false, kd = 99;
@@ -361,6 +369,14 @@ export class Bots {
       // only run when actually hunted: she is close, or in sight and coming this way, or swinging / rushing
       const closing = b.kPrevD != null && b.kPrevD - kd > 0.01;
       if (faded) {} else threat = kd < 7 || (vis && kd < 12 && closing) || (vis && kd < 15 && (K.atk || K.dash || K.aim)) || (kd < Math.min(tr, 12) && (K.atk || K.ab));
+      // Grandpa's shotgun reaches far: him raising it at us, in sight, is a threat from 32m
+      b.juke = false;
+      if (K.char === 'grandpa' && K.aim && vis && kd < 32) { const kf = fwd(K.yaw), toMe = ((p.x - K.x) * kf.x + (p.z - K.z) * kf.z) / (kd || 1); if (toMe > 0.93) { threat = true; b.juke = true; } }
+      // Slendrina's eyes are open: don't stand there looking at her
+      if (K.char === 'slendrina' && K.gaze > 0 && vis && kd < 26) threat = true;
+      // she just appeared next to us
+      if (K.char === 'slendrina' && b.kPrevPos && Math.hypot(K.x - b.kPrevPos.x, K.z - b.kPrevPos.z) > 4 && kd < 10) { threat = true; b.react = D.react; }
+      b.kPrevPos = { x: K.x, z: K.z };
       if (K.carry != null && kd > 6) threat = false;
     }
     if (threat) { b.react += dt; b.alert = 5; b.kLast = { x: K.x, z: K.z, t: S.t }; } else { b.react = 0; b.alert = Math.max(0, (b.alert || 0) - dt); }
@@ -510,6 +526,12 @@ export class Bots {
       if (inStunZone || (myS !== kS && kd < 5.5) || kd < 2.4) { sim.onMsg(p.id, { t: 'act', a: 'drop', id: sp.id }); b.path = null; }
     }
     b.fleeT = (b.fleeT || 0) - dt;
+    // cornered (not getting anywhere): break sideways past the killer instead of pressing into the wall
+    if (b.wd && b.wd.t > 1.2 && !b.cornerT) {
+      const a = Math.atan2(p.x - K.x, p.z - K.z) + (Math.random() < 0.5 ? 1 : -1) * 1.7;
+      b.flee = { x: p.x + Math.sin(a) * 6, z: p.z + Math.cos(a) * 6, A: null }; b.path = null; b.fleeT = 0.9; b.cornerT = 0.9;
+    }
+    if (b.cornerT) { b.cornerT = Math.max(0, b.cornerT - dt); this.move(p, b, b.flee.x - p.x, b.flee.z - p.z, dt, true); return; }
     const M0 = M;
     if (!b.path || b.fleeT <= 0 || b.pi >= (b.path ? b.path.length : 0)) {
       b.fleeT = kd < 9 ? 0.35 : 0.8;
@@ -645,7 +667,8 @@ export class Bots {
       const scent = s.hp === 1 && p.perks.includes('scent') && d < 24;
       const heard = (s.mv === 2 && !s.cr && d < 16 && !s.perks.includes('hushed')) || (s.hp === 1 && d < 9 && !s.perks.includes('hushed'));
       if ((vis && facingOk) || (d < 5 && s.mv && !s.cr) || (scent && d < 14) || s.reveal > 0 || (heard && b.target === s.id)) {
-        const score = d - (b.target === s.id ? 8 : 0) - (s.hp === 1 ? 3 : 0);
+        // (caught in a trap: a free hit; fully Cursed / Heard: one hit downs; low on Grandpa's shotgun bar)
+        const score = d - (b.target === s.id ? 8 : 0) - (s.hp === 1 ? 3 : 0) - (s.snare > 0 ? 10 : 0) - (p.char === 'slendrina' && s.doomed > 0 ? 7 : 0) - (p.char === 'granny' && s.heard > 0 ? 5 : 0) - (p.char === 'grandpa' && (s.shp ?? 100) < 60 ? 5 : 0);
         if (score < td) { td = score; target = s; }
       }
     }
@@ -812,6 +835,15 @@ export class Bots {
         return;
       }
       if (target) { b.prevTX = target.x; b.prevTZ = target.z; }
+      // Grandpa: his shots hit hardest from range, so while the gun cycles he holds mid range and strafes
+      if (p.char === 'grandpa' && target && los && d > 7 && d < 22 && p.abCd > 0 && !(target.snare > 0) && (target.shp ?? 100) > 0) {
+        const side = Math.sin(S.t * 0.9 + p.id.length) > 0 ? 1 : -1, ax = (tx - p.x) / d, az = (tz - p.z) / d;
+        const back = d < 10 ? -0.6 : d > 16 ? 0.6 : 0;
+        p.yaw = Math.atan2(tx - p.x, tz - p.z);
+        this.move(p, b, -az * side + ax * back, ax * side + az * back, dt, false);
+        p.yaw = Math.atan2(tx - p.x, tz - p.z);
+        return;
+      }
       // melee
       const reach = (D.reach || 2.6) + (p.perks.includes('stalker') ? 0.4 : 0) + (p.ambush > 0 ? 1.2 : 0);
       const lungeAng = Math.atan2(tx + tv.x * 0.3 - p.x, tz + tv.z * 0.3 - p.z);
