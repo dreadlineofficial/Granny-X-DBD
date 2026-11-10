@@ -44,6 +44,14 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
 - `public/models/*.glb` (granny, grandpa, granny_anims, granny_map, granny1_map, slendrina, angeline, granny_bear_trap, spidermom, …), `public/img`, `public/fonts`.
 - `tools/build.mjs` → builds **`GrannyDBD.html`** (offline single file, GLBs embedded) and **`index.html`** (web).
 - `tools/electron/` Windows app (Electron 33.2.1). `tools/android/` APK build (no Gradle).
+- `tools/test/` the headless checks used during development (Playwright + SwiftShader; `ROOT` is /home/user/granny-x-dbd):
+  `simtest.mjs <map> <killer> <matches> <minutes>` bot-only matches, prints stall seconds (must be 0);
+  `play.mjs <role> <killer> <map> <prefix>` plays a bot match and saves frames; `look.mjs <killer> <map> <prefix>` in-match shots;
+  `lsshot.mjs out.png medium [menu.png]` loading screen (uses `window.__lsSeek`); `mobile.mjs` phone-emulated menu/help/HUD
+  check (prints any key names left in the HUD); `lobbytest.mjs` 3 players vs a local relay (`node broker.mjs` first:
+  aedes@0.51.3 + aedes-server-factory@0.2.1) for public/private lobbies; `angview.mjs` / `rigview.mjs` character poses;
+  `rawglb.mjs file.glb prefix` plays a GLB's own clips with plain three.js; `render-devlog.mjs` + `devlog13-page.js` the 1.3
+  devlog banner (rendered in-engine, 2560x1440).
 - `server.js` optional LAN server (`node server.js 8090`), `start-*.bat/.sh/.command` launchers.
 - `README.md` is still Nightbound's old README (outdated; don't trust it for this game).
 
@@ -111,9 +119,11 @@ npx @electron/packager . GrannyxDBD --platform=win32 --arch=x64 --out=out --over
 npx electron-builder --win portable --x64 --prepackaged out/GrannyxDBD-win32-x64 --config builder.json  # → dist/GrannyxDBD.exe
 ```
 The single portable `dist/GrannyxDBD.exe` (with `splash.bmp`) is what the owner uploads: people ran the old .exe
-from inside the zip. Without Wine, `--icon` can't be applied by the packager: set icon + version on
-`out/.../GrannyxDBD.exe` with the `resedit` npm package before the electron-builder step. The NSIS installer
-target needs Wine.
+from inside the zip. Without Wine, `--icon` can't be applied by the packager: set icon + version on the packaged exe
+before the electron-builder step: `node tools/electron/seticon.mjs out/GrannyxDBD-win32-x64/GrannyxDBD.exe icon.ico 1.3.1`
+(resedit + pe-library). The NSIS installer target needs Wine. In practice: package with `--ignore='^/out' --ignore='^/dist'`
+(no `--icon`), run seticon, then electron-builder. The owner can't download a bare .exe from the chat: send it zipped
+(`zip -9 GrannyxDBD-<ver>-Windows.zip GrannyxDBD.exe`).
 
 `main.js` opens `app/index.html`, maximised, no menu bar, F11/Alt+Enter fullscreen, single instance, logs to
 `%APPDATA%\Granny x DBD\log.txt`; repeated GPU/page crashes relaunch it in Safe Graphics mode (software WebGL,
@@ -150,6 +160,17 @@ graphics (anisotropy, PCF soft shadows on medium, unsharp mask in PostShader), p
 Discord link, mobile-only controls + APK 1.3.0 (versionCode 13). The 1.3.0 APK was signed with a NEW key (the owner's
 release.jks wasn't available), so players uninstall older APKs first; re-sign with release.jks for later updates.
 Devlog banner "ANGELINE · SLENDRINA'S MOTHER IS HERE" rendered in-engine.
+1.3.1 (current): Angeline animated in code (see Angeline above); APK versionCode 14 / 1.3.1, Windows app 1.3.1
+(config.js `VERSION` still says '1.3.0', NET_PROTOCOL 12: 1.3.0 and 1.3.1 play together). Main branch = latest.
+
+## Where things stand / next steps
+- The 1.3.x APKs are signed with a key made in the 1.3 session (`grannyxdbd-1.3.jks`, alias `grannyxdbd`), which was handed
+  to the owner as a file together with its password file. For the next APK the owner puts that .jks in `tools/android/` (or
+  passes `KS=/path`) and sets `KS_PASS` from the password file, so the update installs over 1.3.x. Never ask for the password
+  in chat; if the owner doesn't have the key, a new key means players uninstall first.
+- Not yet tested on a real phone (only Chromium phone emulation) and the public lobby list was tested against a local relay,
+  not the public brokers.
+- Ideas not done: a 1.3 YouTube Short / trailer with Angeline; bump `VERSION` to 1.3.1 next time anything ships.
 1.2: Granny's Old House enterable, stronger shotgun, taller Slendrina (1.95m), smarter bots, YouTube Short #2
 ("SHE'S NOT ALONE ANYMORE.", rendered in-engine, synthesized score).
 1.1: Grandpa as his own killer, Slendrina, Granny's Old House, bot stall fixes, portable Windows exe,
