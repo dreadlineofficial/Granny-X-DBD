@@ -266,28 +266,24 @@ export const SKINS = {
     { id: 'nightshift', name: 'Night Shift', price: 1500, shirt: 0x2a2e38, pants: 0x15171c, hair: 0x0e0b0a, desc: 'Ball cap, head torch and a scarf against the cold.', fx: [['cap', { color: 0x1a1e26 }], 'headlamp', ['scarf', { color: 0x4a1a1a }]] },
     { id: 'crimson', name: 'Crimson Hood', price: 2500, shirt: 0x6a0d10, pants: 0x222222, desc: 'A blood-red riding cloak, hood up. Not all of the red is dye.', fx: [['hood', { color: 0x6a0a0c }], ['cloak', { color: 0x6a0a0c, flare: 1.8 }], 'blood'] },
     { id: 'medic', name: 'Trauma Medic', price: 4000, shirt: 0xd8d4c8, pants: 0x2a3a4a, desc: 'Gas mask, plate carrier and a field medic pack. Ready for anything.', fx: [['gasmask', { color: 0x2a2e2a }], ['armor', { color: 0x3a4a3a, patch: 0xd02020 }], ['backpack', { color: 0xd8d4c8, cross: true }]] },
-    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'The pizzeria\'s star performer, still running after closing time. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   eli: [
     { id: 'default', name: 'Hoodie', price: 0 },
     { id: 'overalls', name: 'Grease Monkey', price: 1500, shirt: 0x2f4a6a, pants: 0x2f4a6a, desc: 'Beanie, welding goggles and a belt full of tools.', fx: [['beanie', { color: 0x8a2a1a }], ['goggles', { color: 0x3a8a9a }], 'toolbelt'] },
     { id: 'hazard', name: 'Hazard Crew', price: 2500, shirt: 0x3a3a3a, pants: 0x2a2a2a, desc: 'Hard hat with a lamp, respirator and a hi-vis vest.', fx: [['hardhat', { color: 0xe0b020, lamp: true }], ['respirator', { filter: 0xd06020 }], ['hivis', { color: 0xf0a020 }]] },
     { id: 'midnight', name: 'Midnight Run', price: 4000, shirt: 0x14141c, pants: 0x14141c, desc: 'Hood up, hockey mask down, eyes that catch the light.', fx: [['hood', { color: 0x14141c }], ['hockey', { color: 0xe8e4d8, chevron: 0xc01a1a }], ['eyes', { color: 0x6affff }]] },
-    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'The pizzeria\'s star performer, still running after closing time. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   june: [
     { id: 'default', name: 'Knit Sweater', price: 0 },
     { id: 'autumn', name: 'Autumn Coat', price: 1500, shirt: 0x8a4a20, pants: 0x2a2018, desc: 'Long wool coat, beanie and her camera.', fx: [['coat', { color: 0x6a3a1a }], ['beanie', { color: 0xa06030 }], 'camera'] },
     { id: 'ghost', name: 'Ghost Story', price: 2500, shirt: 0xdedad2, pants: 0x3a3a40, hair: 0xe8e0c8, desc: 'She went into the lake to get the photo. Something came back out.', fx: [['ghost', { color: 0xa8d8ff, op: 0.55 }], ['veil', { color: 0xdfe8ff, op: 0.4, len: 7, wide: 2.4 }], ['eyes', { color: 0x9ae0ff }]] },
     { id: 'reporter', name: 'Field Reporter', price: 4000, shirt: 0x4a5a3a, pants: 0x1c1c18, desc: 'Press vest, head torch, camera and a pack full of tapes.', fx: [['armor', { color: 0x3a4a6a, patch: 0xe8e8e8 }], 'headlamp', 'camera', ['backpack', { color: 0x3a3a2a, radio: true }]] },
-    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'The pizzeria\'s star performer, still running after closing time. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   tomas: [
     { id: 'default', name: 'Ranger', price: 0 },
     { id: 'camo', name: 'Woodland Camo', price: 1500, shirt: 0x3a4a2a, pants: 0x2a3020, desc: 'Boonie hat, ghillie strips and a heavy pack.', fx: [['boonie', { color: 0x4a5236 }], ['moss', { color: 0x4a5a2a, glow: 0x000000 }], ['backpack', { color: 0x3a4228 }]] },
     { id: 'firewatch', name: 'Firewatch', price: 2500, shirt: 0xb04020, pants: 0x2a2018, desc: 'Red helmet, smoke goggles and a fire axe across his back.', fx: [['hardhat', { color: 0xb02010 }], ['goggles', { color: 0xd08020, down: true }], 'axe', ['scarf', { color: 0xd8c8a0 }]] },
     { id: 'searchlight', name: 'Search & Rescue', price: 4000, shirt: 0xd86a10, pants: 0x1a1a22, desc: 'Helmet lamp, hi-vis vest and a radio pack with a blinking beacon.', fx: [['hardhat', { color: 0xf0f0f0, lamp: true }], ['hivis', { color: 0xe8e020 }], ['backpack', { color: 0xc04010, radio: true }]] },
-    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'The pizzeria\'s star performer, still running after closing time. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   raghuvir: [
     { id: 'default', name: 'Ghostbuster', price: 0, desc: 'Khaki flight suit, proton pack, name tag. Who you gonna call?', fx: [['face', { kind: 'r', skin: 0xb08058 }], 'fringehair', 'specs', ['protonpack', {}], ['nametag', {}], ['wand', {}]] },
@@ -342,6 +338,7 @@ export const SKINS = {
     { id: 'default', name: 'House Dress', price: 0, desc: 'Her grey nightgown, her bloody bat, and the stare. You know the one.' },
     { id: 'bloodbath', name: 'Spring Cleaning', price: 3000, tint: 0x8a1010, tintK: 0.35, desc: 'She has been busy. Most of the red is not hers.' },
     { id: 'ghost', name: 'Pale Visitor', price: 4500, tint: 0xd8e4f0, tintK: 0.5, glow: 0x6a8aa8, glowK: 0.35, desc: 'Drained of colour, glowing faintly, like something that stayed in the house long after it should have left.' },
+    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'Legendary. The pizzeria\'s star performer, still running after closing time, with her bat in his paw. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   grandpa: [
     { id: 'default', name: 'Night Watch', price: 0, grandpa: true, desc: 'Braces, a dirty vest, his old shotgun and a bad mood.' },
@@ -388,11 +385,12 @@ export const VERSION = '1.3.2';
 // automatically (tools/email-updates.mjs). Small tweaks leave it out and are never mailed.
 export const INBOX = [
   {
-    id: 'gdbd132', version: '1.3.2', date: 'Nov 2026', title: 'Profiles, gifts and smarter bots', tag: 'Update',
+    id: 'gdbd132', version: '1.3.2', date: 'Nov 2026', title: 'Freddy Fazbear, profiles and gifts', tag: 'Update',
     gift: { embers: 1000, label: 'Update gift: 1,000 Embers' },
     body: [
       'Your own profile card: click your name (top right) to pick an avatar, a banner, a title and a motto. Everyone in your lobby sees it.',
-      'Gift outfits: Store > Codes. Buy an outfit as a gift and send the code to a friend; type a code in to redeem it. (There may be a secret or two to find in there.)',
+      "Legendary Freddy Fazbear skin for Granny: the first 10 members of the official Discord get a code for it (Discord button, top of the menu). Redeem it in Store > Codes.",
+      'Gift outfits: Store > Codes. Buy an outfit as a gift and send the code to a friend; type a code in to redeem it.',
       'Smarter bots: survivors split up across the generators, tell each other where the killer is, heal each other, loop around walls and pallets, and stop leading the killer to their friends.',
       "Granny's Ground Slam can only injure now: it never puts anyone down.",
       'Smoother loading into a match, and the loading screen no longer shows the menu through it.',
@@ -459,9 +457,9 @@ export const PROFILE_TITLES = {
   veteran: { name: 'Veteran of the House', hint: '100 matches', need: st => (st.matches || 0) >= 100 },
   hoarder: { name: 'Ember Hoarder', hint: 'hold 10,000 Embers', need: st => (st.embers || 0) >= 10000 },
   gifter: { name: 'Generous', hint: 'gift an outfit', need: (st, P) => !!(P.gifts && P.gifts.length) },
-  showtime: { name: "It's Showtime", hint: 'a secret', secret: true, need: (st, P) => !!(P.owned && P.owned['mara:freddy']) },
+  showtime: { name: "It's Showtime", hint: 'a secret', secret: true, need: (st, P) => !!(P.owned && P.owned['granny:freddy']) },
 };
-// SHA-256 of 'gdbd-showbear:' + code (they unlock the Freddy Fazbear outfit) (no dashes): the codes themselves are not in the game
+// SHA-256 of 'gdbd-showbear:' + code (they unlock Granny's legendary Freddy Fazbear outfit) (no dashes): the codes themselves are not in the game
 export const SECRET_CODES = ["a6fb993d580ca12455d500af871be912e902f2ed21e22e270ca4c5833b09439d", "acf3b8fe9a31f8d8625419ab93a1681e3811330d23e013bcf2965c2ec657aaae", "52517749c1e9d61e4b1c580b718f8e9082446bd4d0bce3755cbc6918d6c755dc", "bd5977e481fdafa95fc238758c7ac53c030a5d241a3cb27b1d42d2aa01d5adcd", "11eea88346def0fb7e43a7b450776842f99f3307859d9b6282a31961bae1dc25", "56f719f05edae38085c1073e6b2c3de395ae0107b3644f984d83a9d5f8a2190f", "7bff9130dc1416c1a7d925add43aa660daf01a1dc2f1a0d839ef6d796523cc0a", "aa0ec1e4854f2e5df076d40da49aa8e735aa7c8ad61e99201a792271145282b4", "617dde538cb62f8050b88286870607fc05f40b6be75e3998f9f1f0095a1a8849", "445358acb7fba3b30c076874c6e309a63be51647781d474abc3316376d947ee7"];
 // gift codes name a character by its place in this list and an outfit by its place in SKINS[char]:
 // only ever add to the END of both, or old gift codes would turn into different outfits

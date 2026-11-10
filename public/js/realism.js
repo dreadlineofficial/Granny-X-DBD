@@ -207,3 +207,73 @@ export function makeRealism(name, proc) {
   if (!models[name]) return null;
   return new RealismRig(name, proc);
 }
+
+// 1.3.2: Freddy Fazbear worn by GRANNY (a legendary killer outfit). Granny's own rig keeps running (her puppet plays
+// her clips, her model follows it) but is not drawn; Freddy's limbs are aimed the way hers point every frame, and
+// her bat moves from her hand to his.
+const GR_AIM = [
+  ['j_spine', 'j_neck', 'Bip01 Spine', 'Bip01 Neck'], ['j_neck', 'j_head', 'Bip01 Neck', 'Bip01 Head'],
+  ['j_l_arm_02', 'j_l_arm_01', 'Bip01 L UpperArm', 'Bip01 L Forearm'], ['j_l_arm_01', 'j_l_hand', 'Bip01 L Forearm', 'Bip01 L Hand'],
+  ['j_r_arm_02', 'j_r_arm_01', 'Bip01 R UpperArm', 'Bip01 R Forearm'], ['j_r_arm_01', 'j_r_hand', 'Bip01 R Forearm', 'Bip01 R Hand'],
+  ['j_l_leg_02', 'j_l_leg_01', 'Bip01 L Thigh', 'Bip01 L Calf'], ['j_l_leg_01', 'j_l_foot', 'Bip01 L Calf', 'Bip01 L Foot'],
+  ['j_r_leg_02', 'j_r_leg_01', 'Bip01 R Thigh', 'Bip01 R Calf'], ['j_r_leg_01', 'j_r_foot', 'Bip01 R Calf', 'Bip01 R Foot'],
+];
+export function freddyOver(R, height = 2.05) {
+  const M = models.freddy; if (!M) return false;
+  const base = n => n.replace(/_\d+$/, '').replace(/_/g, ' ').trim();
+  const src = {}; R.holder.traverse(o => { if (o.isBone) src[base(o.name)] = o; });
+  // Granny's body goes; her bat stays (it moves to Freddy's hand)
+  let bat = null; R.holder.traverse(o => { if (/BatBloody/i.test(o.name)) bat = o; });
+  const keep = new Set(); if (bat) bat.traverse(o => keep.add(o));
+  for (const m of R.meshes) if (!keep.has(m)) m.visible = false;
+  for (const a of R.aura) a.parent && a.parent.remove(a);
+  const model = cloneSkinned(M.scene), s = height / 1.95 * M.fit.s;
+  model.scale.setScalar(s); model.position.set(M.fit.x * s / M.fit.s, M.fit.y * s / M.fit.s, M.fit.z * s / M.fit.s);
+  const body = new THREE.Group(); body.add(model); R.root.add(body);
+  const fb = {}, meshes = [], aura = [];
+  model.traverse(o => {
+    if (o.isBone) fb[boneKey(o.name)] = o;
+    if (o.isMesh) { if (!o.isSkinnedMesh && /mic/i.test(o.name)) { o.visible = false; return; } o.castShadow = true; o.frustumCulled = false; meshes.push(o); }
+  });
+  for (const m of meshes) if (m.isSkinnedMesh) {
+    const a = new THREE.SkinnedMesh(m.geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthTest: false, blending: THREE.AdditiveBlending }));
+    a.bind(m.skeleton, m.bindMatrix); a.position.copy(m.position); a.quaternion.copy(m.quaternion); a.scale.copy(m.scale);
+    a.visible = false; a.renderOrder = 10; a.frustumCulled = false; m.parent.add(a); aura.push(a);
+  }
+  const jaw = fb.j_jaw, jawRest = jaw && jaw.quaternion.clone();
+  const aims = GR_AIM.map(([b, c, s0, s1]) => ({ b: fb[b], c: fb[c], s0: src[s0], s1: src[s1] })).filter(a => a.b && a.c && a.s0 && a.s1);
+  for (const side of ['l', 'r']) { const h = fb['j_' + side + '_hand'], f = h && h.children.find(c => /middle/i.test(c.name)); const S = side.toUpperCase();
+    if (h && f && src[`Bip01 ${S} Forearm`] && src[`Bip01 ${S} Hand`]) aims.push({ b: h, c: f, s0: src[`Bip01 ${S} Forearm`], s1: src[`Bip01 ${S} Hand`] }); }
+  const pelvis = fb.j_pelvis, pelvisRest = pelvis && pelvis.position.clone();
+  R.root.updateMatrixWorld(true);
+  const spine0 = R.spine ? R.spine.t.getWorldPosition(new THREE.Vector3()).y - R.root.getWorldPosition(new THREE.Vector3()).y : 1;
+  const pelvisScale = pelvis && pelvis.parent ? 1 / pelvis.parent.getWorldScale(new THREE.Vector3()).y : 1;
+  const v0 = new THREE.Vector3(), v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
+  let batOff = null, t = 0;
+  const follow0 = R.follow.bind(R);
+  R.follow = () => {
+    follow0();
+    R.root.updateMatrixWorld(true);
+    // crouching / bending: the hips go down as far as hers do (scaled to his height)
+    if (pelvis && R.spine) { const y = R.spine.t.getWorldPosition(v0).y - R.root.getWorldPosition(v1).y; pelvis.position.copy(pelvisRest); pelvis.position.y += (y - spine0) * (height / 1.8) * pelvisScale; pelvis.updateMatrixWorld(true); }
+    for (const a of aims) {
+      const want = a.s1.getWorldPosition(v0).sub(a.s0.getWorldPosition(v1)).normalize();
+      const cur = a.c.getWorldPosition(v2).sub(a.b.getWorldPosition(v1)).normalize();
+      if (cur.lengthSq() < 1e-8 || want.lengthSq() < 1e-8) continue;
+      q0.setFromUnitVectors(cur, want);
+      const pw = a.b.parent.getWorldQuaternion(q1), bw = a.b.getWorldQuaternion(q2);
+      a.b.quaternion.copy(pw.invert().multiply(q0).multiply(bw)); a.b.updateMatrixWorld(true);
+    }
+    if (jaw) { t += 1 / 60; jaw.quaternion.copy(jawRest).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.08 + Math.max(0, Math.sin(t * 0.8)) * 0.12)); }
+    // her bat, in his right hand: the same hold relative to the hand as it had in hers (taken once, on the first frame)
+    if (bat && fb.j_r_hand && src['Bip01 R Hand']) {
+      const fh = fb.j_r_hand.matrixWorld, gh = src['Bip01 R Hand'].matrixWorld;
+      if (!batOff) batOff = new THREE.Matrix4().copy(fh).invert().multiply(gh).multiply(new THREE.Matrix4().copy(gh).invert().multiply(bat.matrixWorld));
+      const w = new THREE.Matrix4().copy(fh).multiply(batOff), local = new THREE.Matrix4().copy(bat.parent.matrixWorld).invert().multiply(w);
+      local.decompose(bat.position, bat.quaternion, bat.scale); bat.updateMatrixWorld(true);
+    }
+  };
+  R.meshes = meshes.concat(bat ? R.meshes.filter(m => keep.has(m)) : []); R.aura = aura;
+  R.freddy = true;
+  return true;
+}

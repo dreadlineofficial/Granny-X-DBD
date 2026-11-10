@@ -199,10 +199,10 @@ loadAngeline().then(m => { if (m) { forgetArt('angeline'); if (menu && menu.kill
 const spiderOk = () => !!window.__nbSpiderLoaded;
 loadSpiderMom().then(m => { window.__nbSpiderLoaded = !!m; });
 // the Freddy Fazbear outfit (1.3.2): a 5 MB model, loaded only for players who own it or meet someone wearing it
-const ownsFreddy = () => ['mara', 'eli', 'june', 'tomas'].some(c => profile.owned[c + ':freddy']);
+const ownsFreddy = () => !!profile.owned['granny:freddy'];
 function loadFreddy() {
-  return loadRealism('freddy').then(m => { if (!m) return; for (const c of ['mara', 'eli', 'june', 'tomas']) forgetArt(c);
-    if (menu) menu.setSurvivor(profile.survivor.char, skinId(profile.survivor.char)); if (!$('store').classList.contains('hidden')) renderStore(); renderShowcase(); });
+  return loadRealism('freddy').then(m => { if (!m) return; forgetArt('granny');
+    if (menu) menu.setKiller(profile.killer.char, skinId(profile.killer.char)); if (!$('store').classList.contains('hidden')) { if (menu) menu.showFor = null; renderStore(); } renderShowcase(); });
 }
 if (ownsFreddy()) setTimeout(loadFreddy, 1500);
 async function waitForModels(need) {
@@ -543,7 +543,7 @@ $('pause-vol').addEventListener('input', e => { settings.vol = +e.target.value; 
 // ---------- store ----------
 // ---------- store (full screen, DbD-style) ----------
 const RARITY0 = p => p === 0 ? '' : p < 2000 ? 'common' : p < 3500 ? 'rare' : p < 5000 ? 'epic' : 'legendary';
-const RARITY = (p, sk) => sk && sk.secret ? 'secret' : sk && sk.god ? 'god' : sk && sk.limited ? 'limited' : RARITY0(p);
+const RARITY = (p, sk) => sk && sk.god ? 'god' : sk && sk.limited ? 'limited' : RARITY0(p);
 let storeTab = 'characters', storeRole = 'survivor', storeChar = null, storePreview = null;
 const ownsChapter = id => !!(profile.dlc && profile.dlc[id]);
 // ---------- killer power levels (reach in metres, bought with Embers) ----------
@@ -633,7 +633,7 @@ function charactersHTML() {
       : locked ? `<button class="btn primary" data-tab="chapters">Get the ${esc(CHAPTERS.find(c => c.killer === storeChar).name)} chapter</button>`
       : eq ? '<span class="of-p eq" style="font-size:16px">Equipped</span>' : own ? `<button class="btn primary" data-eq="${sel.id}">Equip</button>`
       : `<span class="ch-price">${price(sel.price)}</span><button class="btn primary" data-buy="${sel.id}">Buy</button>`;
-    detail = `<div class="cs-detail ${r}"><div class="rk">${r === 'base' ? 'Default outfit' : r === 'limited' ? 'Limited edition' : r === 'god' ? 'God tier · changes how you play' : r === 'secret' ? 'Secret outfit' : r}</div><h3>${esc(sel.name)}</h3><p>${esc(charName(storeChar))}${sel.desc ? ` · ${esc(sel.desc)}` : ''}</p><div class="row">${act}</div></div>`;
+    detail = `<div class="cs-detail ${r}"><div class="rk">${r === 'base' ? 'Default outfit' : r === 'limited' ? 'Limited edition' : r === 'god' ? 'God tier · changes how you play' : r === 'legendary' && sel.secret ? 'Legendary · secret code' : r}</div><h3>${esc(sel.name)}</h3><p>${esc(charName(storeChar))}${sel.desc ? ` · ${esc(sel.desc)}` : ''}</p><div class="row">${act}</div></div>`;
   }
   return `<div class="cs-wrap"><div class="cs-roles"><button data-role="survivor" class="${storeRole === 'survivor' ? 'on' : ''}">Survivors</button><button data-role="killer" class="${storeRole === 'killer' ? 'on' : ''}">Killers</button></div>
     <div class="cs-grid">${grid}</div>
@@ -683,10 +683,10 @@ function redeem(input) {
   profile.redeemed ||= {};
   if (profile.redeemed[c.id]) { say('This code was already used on this device.'); return; }
   if (c.kind === 'secret') {
-    if (['mara', 'eli', 'june', 'tomas'].every(ch => profile.owned[ch + ':freddy'])) { say('You already have the Freddy Fazbear outfit.'); return; }
-    for (const ch of ['mara', 'eli', 'june', 'tomas']) profile.owned[ch + ':freddy'] = true;
+    if (profile.owned['granny:freddy']) { say('You already have the Freddy Fazbear outfit.'); return; }
+    profile.owned['granny:freddy'] = true;
     profile.redeemed[c.id] = true; saveProfile(); sound.play('escaped');
-    say('Secret unlocked: Freddy Fazbear, for all four survivors! Find him in Characters.', true);
+    say('Legendary outfit unlocked: Freddy Fazbear for Granny! Find it in Characters > Killers > Granny.', true);
     toast('Secret outfit unlocked: Freddy Fazbear');
     loadFreddy();
     return;

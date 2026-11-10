@@ -4,21 +4,22 @@ import { chromium } from 'playwright';
 import http from 'node:http'; import { readFile, writeFile, mkdir } from 'node:fs/promises'; import { join, extname } from 'node:path';
 const ROOT = '/home/user/granny-x-dbd';
 const MIME = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.woff2': 'font/woff2', '.glb': 'model/gltf-binary', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.ktx2': 'image/ktx2', '.wasm': 'application/wasm' };
-export async function open({ killer = 'angeline', map = 'granny', quality = 'high', w = 1920, h = 1080, diff = 'normal' } = {}) {
+export async function open({ killer = 'angeline', map = 'granny', quality = 'high', w = 1920, h = 1080, diff = 'normal', role = 'survivor', killerSkin = null } = {}) {
   const srv = http.createServer(async (q, r) => { let u = decodeURIComponent(q.url.split('?')[0]); if (u === '/') u = '/index.html'; try { const b = await readFile(join(ROOT, u)); r.writeHead(200, { 'content-type': MIME[extname(u)] || 'application/octet-stream' }); r.end(b); } catch { r.writeHead(404); r.end(); } }).listen(0);
   const br = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
   const ctx = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
-  await ctx.addInitScript(([killer, quality]) => {
+  await ctx.addInitScript(([killer, quality, killerSkin]) => {
+    if (killerSkin) window.__killerSkin = killerSkin;
     localStorage.setItem('gdbd_profile', JSON.stringify({ seen: { intro: true, help: true, tut: true, granny: true }, killer: { char: killer, perks: [] }, survivor: { char: 'mara', perks: [] } }));
     localStorage.setItem('gdbd_settings', JSON.stringify({ quality, name: 'Mara', vol: 0, music: 0 }));
     window.__nbNoRTC = true; window.__nbMqtt = ['ws://127.0.0.1:1'];
-  }, [killer, quality]);
+  }, [killer, quality, killerSkin]);
   const pg = await ctx.newPage(); const errs = [];
   pg.on('pageerror', e => errs.push(e.message));
   await pg.goto(`http://localhost:${srv.address().port}/public/index.html`);
   await pg.waitForFunction(() => window.__nb && document.querySelector('#mainnav button') && document.getElementById('loading').classList.contains('hidden'), null, { timeout: 300000 });
-  await pg.evaluate(() => document.querySelector('#mainnav button[data-act="play-survivor"]').click()); await pg.waitForTimeout(600);
-  await pg.selectOption('#bots-map', map); await pg.selectOption('#bots-killer', killer);
+  await pg.evaluate(r => document.querySelector(`#mainnav button[data-act="play-${r}"]`).click(), role); await pg.waitForTimeout(600);
+  await pg.selectOption('#bots-map', map); if (role === 'survivor') await pg.selectOption('#bots-killer', killer);
   try { await pg.selectOption('#bots-diff', diff); } catch {}
   await pg.evaluate(() => document.getElementById('btn-bots-start').click());
   await pg.waitForFunction(() => window.__nb.session && window.__nb.session.game && document.getElementById('loading').classList.contains('hidden'), null, { timeout: 600000 });

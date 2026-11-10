@@ -189,16 +189,19 @@ props render untextured (white). New checks in tools/test: `diag.mjs <killer> <m
 stalls, texture/program counts), `ctxloss.mjs` (lose + restore the context mid-match), `lsover.mjs` (loading screen over
 the menu), `onlinestart.mjs` (host + client start a match through the local broker; run `node broker.mjs` first).
 
-1.3.2 (Nov 2026, current; APK versionCode 17, NET_PROTOCOL still 12 so it plays with 1.3.0):
+1.3.2 (Nov 2026, current; APK versionCode 19, NET_PROTOCOL still 12 so it plays with 1.3.0):
 - Profile cards: `profile.card {av, avs, bn, tt, mo}` (avatar char + outfit, banner, title, motto), `PROFILE_BANNERS` /
   `PROFILE_TITLES` (titles with `need(stats, profile)`) in config.js; panel `p-profile` opens from the top-right chip
   (`renderProfileEditor`, `myCard`, `cleanCard`); the card rides on `hello` / `card` messages and lobby players (`p.card`).
 - Store > Codes (`codes.js`, own sync SHA-256): 10 secret codes (only salted hashes in `SECRET_CODES`; the codes were handed to
-  the owner as freddy-codes.txt, never put them in the repo) unlock the Freddy Fazbear outfit (`freddy`, secret: true) for the
-  four survivors; gift codes (`makeGift` / `readCode`, 12 chars, checksum 'gdbd-gift-v1', char/outfit by index in
+  the owner as freddy-codes.txt, never put them in the repo) unlock **Granny's legendary Freddy Fazbear skin** (`granny:freddy`,
+  secret: true; the owner gives them to the first 10 Discord members); gift codes (`makeGift` / `readCode`, 12 chars, checksum 'gdbd-gift-v1', char/outfit by index in
   `GIFT_CHARS` / `SKINS[char]`: only ever append to those lists). `profile.redeemed` = one use per device; `profile.gifts`.
   Secret outfits are hidden in the Store until owned, never in collections, never picked by bots (`botSurvivor`/`botKiller`).
-- Freddy: the owner's GLB ("FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab Standard licence: used in builds, not
+- Freddy on Granny: `freddyOver(R)` (realism.js) on a GrannyRig: her rig keeps running hidden, Freddy's spine/neck/limbs/hands are
+  aimed along her bones each frame (`GR_AIM`), her bat is carried in his right hand, pelvis follows her crouch; her first-person
+  arms turn brown fur (`makeViewModel`, vsk.glb). (It was briefly a survivor outfit; the owner wanted it on Granny.)
+- Freddy model: the owner's GLB ("FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab Standard licence: used in builds, not
   redistributed on its own) at public/models/freddy.glb (textures recompressed to JPEG, 5.1 MB) is **gitignored**: ask the owner
   for the file if it's missing (build.mjs skips missing GLBs). realism.js `PROFILES.freddy`: no toBindPose (the file is at 1/100
   scale), size from the skinned vertices, limbs aimed at the procedural rig's limb directions (`aimLimbs`, rotation copying
@@ -212,7 +215,11 @@ the menu), `onlinestart.mjs` (host + client start a match through the local brok
   placement, `shoot132.mjs`, `uishots132.mjs`, `uiseg132.py`, `overlays132.cjs`, `score132.py` numpy score, `cut132.sh`
   ffmpeg edit). Use quality 'low' (0.5 s/frame vs 10 s at medium/high in SwiftShader); the game drops its pixel ratio when
   slow, so footage came out 960x540 (upscaled): shoot132 now pins it to 1. Key art: tools/test/devlog132-page.js via
-  `render-devlog.mjs devlog132-page.js out.png devlog|thumb`.
+  `render-devlog.mjs devlog132-page.js out.png devlog|thumb`. Trailer v2 (what shipped): Freddy first + 'free for the first 10
+  Discord members', then 'play as' each killer (killer-role matches, our player bot-driven, game camera: shoot132b.mjs), profile
+  cards, gifting, '+ smarter bots' as a small mention (owner: don't centre it on the bots); cut132b.sh + score132b.py +
+  overlays132b.cjs. Devlog thumbnail = devlog132b-page.js (Freddy + outline); trailer thumbnail = devlog132c-page.js (owner: not
+  about the skin: 'PICK YOUR KILLER.', the four killers).
 
 ## Where things stand / next steps
 - The "textures go missing / very dark" report (EXE + APK) is not reproduced in SwiftShader; fixes above cover the likely

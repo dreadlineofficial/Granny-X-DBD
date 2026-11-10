@@ -7,6 +7,7 @@
 //    follows it (world-space rotation from rest), so she moves with her own animations: idle, Walk,
 //    Hit (bat swing), arrowHit (staggered), pepperHit (blinded), freezeTrap, Look, lookBed (bending).
 import * as THREE from 'three';
+import { freddyOver } from './realism.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { auraSkinMat } from './foremanGlb.js';
@@ -386,7 +387,10 @@ export function makeGrannyGlb(sk = {}, lite = false) {
     R.root.traverse(o => { if (o.isMesh && /Glasses|Hat_Santa|RedEyes|Ragdoll/i.test(o.name)) o.visible = false; });
     return R;
   }
-  return grannyReady() ? new GrannyRig(sk, lite) : null;
+  if (!grannyReady()) return null;
+  const R = new GrannyRig(sk, lite);
+  if (sk.glb === 'freddy') freddyOver(R); // (1.3.2 legendary outfit; plain Granny until the model has loaded)
+  return R;
 }
 // Spider Mom: crawls, sniffs about, screeches
 export function makeSpiderMom(lite = false) {

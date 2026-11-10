@@ -32,8 +32,10 @@ console.log('gift bought', gift.code, gift.name, 'embers', before, '->', await p
 await pg.screenshot({ path: OUT + '-codes.png' });
 // characters tab: the Showbear outfit shows for Mara now
 await pg.evaluate(() => document.querySelector('#st-tabs [data-t="characters"]').click()); await pg.waitForTimeout(800);
-const of = await pg.evaluate(() => [...document.querySelectorAll('.of')].map(e => e.dataset.s).join());
-console.log('mara outfits', of);
+await pg.evaluate(() => document.querySelector('.cs-roles [data-role="killer"]').click()); await pg.waitForTimeout(800);
+await pg.evaluate(() => document.querySelector('.cs-por[data-c="granny"]').click()); await pg.waitForTimeout(800);
+const of = await pg.evaluate(() => [...document.querySelectorAll('.of')].map(e => e.dataset.s + ':' + e.className).join(' '));
+console.log('granny outfits', of, 'detail:', await pg.evaluate(() => document.querySelector('.cs-detail .rk') && document.querySelector('.cs-detail .rk').textContent));
 if (of.includes('freddy')) { await pg.evaluate(() => document.querySelector('.of[data-s="freddy"]').click()); await pg.waitForTimeout(2500); await pg.screenshot({ path: OUT + '-bear.png' }); }
 // a second player redeems the gift
 const ctx2 = await br.newContext({ viewport: { width: 1280, height: 720 } });
