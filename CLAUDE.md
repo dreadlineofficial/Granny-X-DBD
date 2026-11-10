@@ -218,8 +218,9 @@ the menu), `onlinestart.mjs` (host + client start a match through the local brok
   `render-devlog.mjs devlog132-page.js out.png devlog|thumb`. Trailer v2 (what shipped): Freddy first + 'free for the first 10
   Discord members', then 'play as' each killer (killer-role matches, our player bot-driven, game camera: shoot132b.mjs), profile
   cards, gifting, '+ smarter bots' as a small mention (owner: don't centre it on the bots); cut132b.sh + score132b.py +
-  overlays132b.cjs. Devlog thumbnail = devlog132b-page.js (Freddy + outline); trailer thumbnail = devlog132c-page.js (owner: not
-  about the skin: 'PICK YOUR KILLER.', the four killers).
+  overlays132b.cjs. Devlog thumbnail = devlog132b-page.js (Freddy + outline); trailer thumbnail = trailerthumb132-page.js (owner: not
+  about the skin, and it should look like a proper trailer: Granny big in front with the bat, the other three backlit in fog,
+  logo + red OFFICIAL TRAILER bar, teal/red grade, grain). Angeline faces the camera at yaw ~ -0.3 (not PI).
 
 ## Where things stand / next steps
 - The "textures go missing / very dark" report (EXE + APK) is not reproduced in SwiftShader; fixes above cover the likely
