@@ -57,7 +57,7 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
 
 ## Identity / namespacing (keep separate from Nightbound)
 - localStorage prefix `gdbd_` (e.g. `gdbd_settings`, `gdbd_profile`).
-- Relay topics `grannydbd/v1/...`, PeerJS prefix `grannydbd-v1-`. `NET_PROTOCOL = 12`, `VERSION = '1.3.0'` (config.js).
+- Relay topics `grannydbd/v1/...`, PeerJS prefix `grannydbd-v1-`. `NET_PROTOCOL = 12`, `VERSION = '1.3.2'` (config.js).
 - Public lobbies (1.3): the host publishes a retained message on `grannydbd/v1/pub/<4-char stem>` (`H.advertise(info|null)`
   in net.js, refreshed on every lobby change and each 60 s) with an MQTT last will that clears it if the host drops.
   `watchLobbies(cb)` subscribes `grannydbd/v1/pub/+` on every broker; main.js renders the list + Quick Join.
@@ -171,7 +171,7 @@ Discord link, mobile-only controls + APK 1.3.0 (versionCode 13). The 1.3.0 APK w
 release.jks wasn't available), so players uninstall older APKs first; re-sign with release.jks for later updates.
 Devlog banner "ANGELINE · SLENDRINA'S MOTHER IS HERE" rendered in-engine.
 1.3.1 build: Angeline animated in code (see Angeline above); APK versionCode 14.
-The owner calls the current version **1.3.0**: keep `VERSION` '1.3.0' and label builds 1.3.0 unless told otherwise.
+(The owner called the Nov 2026 fix builds 1.3.0; the next release was 1.3.2.)
 Nov 2026 rebuild (1.3.0): Windows exe launch fix (`executableName`), new startup splash (NSIS splash.bmp + in-app splash
 window), installer build, APK versionCode 15 / versionName 1.3.0 signed with grannyxdbd-1.3.jks (installs over 1.3.x).
 
@@ -188,6 +188,31 @@ granny_map.glb has 7 zero-length images (Button, ShotgunAmmo, Slingshot, Teddy, 
 props render untextured (white). New checks in tools/test: `diag.mjs <killer> <map> <quality>` (load time, longest frame
 stalls, texture/program counts), `ctxloss.mjs` (lose + restore the context mid-match), `lsover.mjs` (loading screen over
 the menu), `onlinestart.mjs` (host + client start a match through the local broker; run `node broker.mjs` first).
+
+1.3.2 (Nov 2026, current; APK versionCode 17, NET_PROTOCOL still 12 so it plays with 1.3.0):
+- Profile cards: `profile.card {av, avs, bn, tt, mo}` (avatar char + outfit, banner, title, motto), `PROFILE_BANNERS` /
+  `PROFILE_TITLES` (titles with `need(stats, profile)`) in config.js; panel `p-profile` opens from the top-right chip
+  (`renderProfileEditor`, `myCard`, `cleanCard`); the card rides on `hello` / `card` messages and lobby players (`p.card`).
+- Store > Codes (`codes.js`, own sync SHA-256): 10 secret codes (only salted hashes in `SECRET_CODES`; the codes were handed to
+  the owner as freddy-codes.txt, never put them in the repo) unlock the Freddy Fazbear outfit (`freddy`, secret: true) for the
+  four survivors; gift codes (`makeGift` / `readCode`, 12 chars, checksum 'gdbd-gift-v1', char/outfit by index in
+  `GIFT_CHARS` / `SKINS[char]`: only ever append to those lists). `profile.redeemed` = one use per device; `profile.gifts`.
+  Secret outfits are hidden in the Store until owned, never in collections, never picked by bots (`botSurvivor`/`botKiller`).
+- Freddy: the owner's GLB ("FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab Standard licence: used in builds, not
+  redistributed on its own) at public/models/freddy.glb (textures recompressed to JPEG, 5.1 MB) is **gitignored**: ask the owner
+  for the file if it's missing (build.mjs skips missing GLBs). realism.js `PROFILES.freddy`: no toBindPose (the file is at 1/100
+  scale), size from the skinned vertices, limbs aimed at the procedural rig's limb directions (`aimLimbs`, rotation copying
+  folded the arms), hands follow the forearms, the microphone is hidden, jaw twitches. Loaded only when owned or worn in a match.
+- Ground Slam: `damage(s, K, instantDown, injureOnly)`: the slam injures healthy survivors only, never downs.
+- Bots: team intel (`this.intel` = last seen/heard killer, who she's chasing), generator claims + spreading out, heal / get
+  healed (a repairing bot pauses for an injured teammate within 3 m), `leadPenalty` (don't flee towards teammates on gens),
+  `b.brave` (after 2.5 s stuck, squeeze past known bear traps at 1 m). Escape rates vs Grandpa/Angeline stay near zero
+  (killer bots dominate survivor bots); `tools/test/botstats.sh <map> <n> <min>` aggregates simtest runs.
+- Trailer: tools/trailer (`rig.mjs` frame-by-frame match capture via `window.__cine` with `__orbit`/`__clear` camera
+  placement, `shoot132.mjs`, `uishots132.mjs`, `uiseg132.py`, `overlays132.cjs`, `score132.py` numpy score, `cut132.sh`
+  ffmpeg edit). Use quality 'low' (0.5 s/frame vs 10 s at medium/high in SwiftShader); the game drops its pixel ratio when
+  slow, so footage came out 960x540 (upscaled): shoot132 now pins it to 1. Key art: tools/test/devlog132-page.js via
+  `render-devlog.mjs devlog132-page.js out.png devlog|thumb`.
 
 ## Where things stand / next steps
 - The "textures go missing / very dark" report (EXE + APK) is not reproduced in SwiftShader; fixes above cover the likely

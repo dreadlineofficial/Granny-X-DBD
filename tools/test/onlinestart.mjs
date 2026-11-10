@@ -25,6 +25,7 @@ await B.pg.evaluate(q => document.querySelector(q).click(), '[data-join]');
 await B.pg.waitForFunction(() => window.__nb.lobby && window.__nb.lobby.players.length === 2, null, { timeout: 60000 });
 console.log('B joined');
 await B.pg.evaluate(() => { window.__toasts = []; new MutationObserver(() => window.__toasts.push(Math.round(performance.now()) + ' ' + document.getElementById('toast').textContent)).observe(document.getElementById('toast'), { childList: true, characterData: true, subtree: true }); });
+console.log('cards', await A.pg.evaluate(() => JSON.stringify(window.__nb.lobby.players.map(p => [p.name, p.card]))), await B.pg.evaluate(() => document.querySelectorAll('.slot.carded').length));
 console.log('before start A lobby', await A.pg.evaluate(() => [window.__nb.lobby.players.map(p => p.name + ':' + p.id).join(), window.__nb.lobby.map]), 'B lobby', await B.pg.evaluate(() => window.__nb.lobby && [window.__nb.lobby.players.map(p => p.name).join(), window.__nb.lobby.myId, document.getElementById('p-lobby').classList.contains('hidden')]));
 await A.pg.evaluate(() => { const n = window.__nb.lobby.net, b = n.broadcast.bind(n); window.__sent = {}; n.broadcast = (m, ...r) => { window.__sent[m.t] = (window.__sent[m.t] || 0) + 1; return b(m, ...r); }; });
 await A.pg.evaluate(q => document.querySelector(q).click(), '#btn-lobby-start');

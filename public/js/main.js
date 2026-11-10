@@ -26,8 +26,9 @@ import { showLoading, loadingUp, sceneShownAt } from './loadscreen.js';
 import { initTouch, MOBILE, mobileText } from './touch.js';
 import { ACTIONS, bound, keyName, RESERVED } from './keybinds.js';
 import { hostRoom, joinRoom, relayAvailable, watchLobbies } from './net.js';
-import { ITEMS, KILLERS, SURVIVORS, SURV_PERKS, KILLER_PERKS, DEFAULT_SURV_PERKS, DEFAULT_KILLER_PERKS, BOT_NAMES, SNAP_RATE, NET_PROTOCOL, MODES, LORE, PERK_PRICES, PERK_SLOTS, SIDEKICKS, SKINS, INBOX, VERSION, CHAPTERS, CHAPTER_OF , NEWSLETTER , PLAY_K, PLAY_S, playable, POWER_LV, powerReach } from './config.js';
+import { ITEMS, KILLERS, SURVIVORS, SURV_PERKS, KILLER_PERKS, DEFAULT_SURV_PERKS, DEFAULT_KILLER_PERKS, BOT_NAMES, SNAP_RATE, NET_PROTOCOL, MODES, LORE, PERK_PRICES, PERK_SLOTS, SIDEKICKS, SKINS, INBOX, VERSION, CHAPTERS, CHAPTER_OF , NEWSLETTER , PLAY_K, PLAY_S, playable, POWER_LV, powerReach, GIFT_CHARS, PROFILE_BANNERS, PROFILE_TITLES } from './config.js';
 import { art, forget as forgetArt } from './portraits.js';
+import { readCode, makeGift } from './codes.js';
 import { levelOf, rankOf, rankBadge, applyMatch, SEASON, seasonTier, seasonEnds, TIERS, PIPS_PER_GRADE } from './progress.js';
 import { Friends, fmtCode, GIFT_MAX } from './friends.js';
 import { Awards, AWARD, revealOf } from './awards.js';
@@ -197,7 +198,15 @@ loadAngeline().then(m => { if (m) { forgetArt('angeline'); if (menu && menu.kill
 // a match with Chucky in it waits (on the loading screen) for his real model, up to 20s
 const spiderOk = () => !!window.__nbSpiderLoaded;
 loadSpiderMom().then(m => { window.__nbSpiderLoaded = !!m; });
+// the Freddy Fazbear outfit (1.3.2): a 5 MB model, loaded only for players who own it or meet someone wearing it
+const ownsFreddy = () => ['mara', 'eli', 'june', 'tomas'].some(c => profile.owned[c + ':freddy']);
+function loadFreddy() {
+  return loadRealism('freddy').then(m => { if (!m) return; for (const c of ['mara', 'eli', 'june', 'tomas']) forgetArt(c);
+    if (menu) menu.setSurvivor(profile.survivor.char, skinId(profile.survivor.char)); if (!$('store').classList.contains('hidden')) renderStore(); renderShowcase(); });
+}
+if (ownsFreddy()) setTimeout(loadFreddy, 1500);
 async function waitForModels(need) {
+  if (need && need.freddy && !realismReady('freddy')) { loading(true, 'Someone brought a friend from the pizzeria…'); await Promise.race([loadRealism('freddy'), new Promise(r => setTimeout(r, 25000))]); }
   if (need && need.spider && !realismReady('spiderman')) { loading(true, 'Spider-Man is swinging in…'); await Promise.race([loadRealism('spiderman'), new Promise(r => setTimeout(r, 25000))]); }
   // the Granny's House scenery (a big model) must be in before any match can use the map
   if (!sceneReady('granny_map') || !sceneReady('granny1_map')) { loading(true, 'Unlocking Granny\'s front door…'); await Promise.race([Promise.all([loadScene('granny_map'), loadScene('granny1_map')]), new Promise(r => setTimeout(r, 25000))]); }
@@ -222,11 +231,59 @@ function renderShowcase() {
   }
   const st = profile.stats;
   const lv = levelOf((profile.prog || {}).xp || 0), rk = rankOf(((profile.prog || {}).ranks || {})[menuMode === 'killer' ? 'killer' : 'survivor'] || 0);
-  $('profile').innerHTML = `<div class="pn">${esc(settings.name)}</div><div class="pe">${icon('ember')}${Math.round(st.embers).toLocaleString()}</div><div class="ps">${st.matches} matches · ${st.escapes} escapes · ${st.kills} kills</div>`;
+  const cd = myCard(), ban = PROFILE_BANNERS[cd.bn] || PROFILE_BANNERS.blood;
+  $('profile').style.setProperty('--ban-a', ban.a); $('profile').style.setProperty('--ban-b', ban.b);
+  $('profile').innerHTML = `<div class="pf-chip"><div class="pf-txt"><div class="pn">${esc(settings.name)}</div><div class="ptt">${esc(titleName(cd.tt))}</div><div class="pe">${icon('ember')}${Math.round(st.embers).toLocaleString()}</div><div class="ps">${st.matches} matches · ${st.escapes} escapes · ${st.kills} kills</div></div><img class="pf-av" alt="" src="${art('portrait', cd.av, avSkin(cd.av), 160, 160)}"></div>`;
+}
+
+// ---------- 1.3.2: profile card (name, avatar, banner, title, motto) ----------
+const titleOk = id => { const T = PROFILE_TITLES[id]; return !!T && (!T.need || T.need(profile.stats || {}, profile)); };
+const titleName = id => (PROFILE_TITLES[id] || PROFILE_TITLES.fog).name;
+const avChars = () => [...PLAY_S, ...PLAY_K].filter(c => (SURVIVORS[c] || KILLERS[c]) && ownsChar(c));
+const avSkin = c => (profile.card && profile.card.av === c && profile.card.avs && (SKINS[c] || []).some(k => k.id === profile.card.avs && (k.price === 0 || profile.owned[c + ':' + k.id]))) ? profile.card.avs : skinId(c);
+function myCard() {
+  const c = profile.card ||= {};
+  if (!(SURVIVORS[c.av] || KILLERS[c.av])) c.av = profile.survivor.char || 'mara';
+  if (!PROFILE_BANNERS[c.bn]) c.bn = 'blood';
+  if (!titleOk(c.tt)) c.tt = 'fog';
+  c.mo = String(c.mo || '').slice(0, 40);
+  return { av: c.av, avs: avSkin(c.av), bn: c.bn, tt: c.tt, mo: c.mo };
+}
+// another player's card, as it came over the network
+function cleanCard(c) {
+  if (!c || typeof c !== 'object') return null;
+  const av = SURVIVORS[c.av] || KILLERS[c.av] ? c.av : 'mara';
+  return { av, avs: (SKINS[av] || []).some(k => k.id === c.avs) ? c.avs : 'default', bn: PROFILE_BANNERS[c.bn] ? c.bn : 'blood', tt: PROFILE_TITLES[c.tt] ? c.tt : 'fog', mo: String(c.mo || '').slice(0, 40) };
+}
+function renderProfileEditor() {
+  const el = $('profile-body'); if (!el) return;
+  const cd = myCard(), ban = PROFILE_BANNERS[cd.bn], st = profile.stats;
+  el.innerHTML = `<div class="pf-card" style="--ban-a:${ban.a};--ban-b:${ban.b}"><img alt="" src="${art('portrait', cd.av, cd.avs, 224, 224)}"><div><b>${esc(settings.name)}</b><span class="pf-tt">${esc(titleName(cd.tt))}</span><i>${cd.mo ? '"' + esc(cd.mo) + '"' : ''}</i><small>${st.matches} matches · ${st.escapes} escapes · ${st.kills} kills</small></div></div>
+    <div class="pf-sec">Name</div><input id="pf-name" maxlength="16" value="${esc(settings.name)}" autocomplete="off" spellcheck="false">
+    <div class="pf-sec">Motto <small>shown on your card in lobbies</small></div><input id="pf-motto" maxlength="40" value="${esc(cd.mo)}" placeholder="Say something before she hears you…" autocomplete="off">
+    <div class="pf-sec">Avatar</div><div class="pf-avs">${avChars().map(c => `<button class="${c === cd.av ? 'on' : ''}" data-av="${c}" title="${esc(charName(c))}"><img alt="" src="${art('portrait', c, skinId(c), 112, 112)}"></button>`).join('')}</div>
+    ${(SKINS[cd.av] || []).filter(k => k.price === 0 || profile.owned[cd.av + ':' + k.id]).length > 1 ? `<div class="pf-sec">Avatar outfit</div><div class="pf-chips">${(SKINS[cd.av] || []).filter(k => k.price === 0 || profile.owned[cd.av + ':' + k.id]).map(k => `<button class="${k.id === cd.avs ? 'on' : ''}" data-avs="${k.id}">${esc(k.name)}</button>`).join('')}</div>` : ''}
+    <div class="pf-sec">Banner</div><div class="pf-bans">${Object.entries(PROFILE_BANNERS).map(([id, b]) => `<button class="${id === cd.bn ? 'on' : ''}" data-bn="${id}" title="${esc(b.name)}" style="background:linear-gradient(135deg,${b.a},${b.b})"></button>`).join('')}</div>
+    <div class="pf-sec">Title</div><div class="pf-chips">${Object.entries(PROFILE_TITLES).filter(([id, T]) => !T.secret || titleOk(id)).map(([id, T]) => { const ok = titleOk(id); return `<button class="${id === cd.tt ? 'on' : ''} ${ok ? '' : 'locked'}" data-tt="${id}" ${ok ? '' : 'disabled'} title="${ok ? '' : 'Unlock: ' + esc(T.hint || '')}">${esc(T.name)}${ok ? '' : `<small>${esc(T.hint || '')}</small>`}</button>`; }).join('')}</div>`;
+  const nm = $('pf-name'), mo = $('pf-motto');
+  nm.onkeydown = mo.onkeydown = e => e.stopPropagation();
+  nm.onchange = () => { settings.name = nm.value.trim().slice(0, 16) || 'Player'; saveSettings(); if ($('set-name')) $('set-name').value = settings.name; renderShowcase(); renderProfileEditor(); };
+  mo.onchange = () => { profile.card.mo = mo.value.trim().slice(0, 40); saveProfile(); renderProfileEditor(); };
+  const set = (k, v) => { profile.card[k] = v; if (k === 'av') delete profile.card.avs; saveProfile(); sound.play('click'); renderShowcase(); renderProfileEditor(); if (lobby) sendMyCard(); };
+  el.querySelectorAll('[data-av]').forEach(b => b.onclick = () => set('av', b.dataset.av));
+  el.querySelectorAll('[data-avs]').forEach(b => b.onclick = () => set('avs', b.dataset.avs));
+  el.querySelectorAll('[data-bn]').forEach(b => b.onclick = () => set('bn', b.dataset.bn));
+  el.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { if (titleOk(b.dataset.tt)) set('tt', b.dataset.tt); });
+}
+// in a lobby: everyone sees the new card straight away
+function sendMyCard() {
+  if (!lobby) return;
+  if (lobby.isHost) { const me = lobby.players.find(p => p.id === lobby.myId || p.host); if (me) { me.card = myCard(); me.name = settings.name; } broadcastLobby(); }
+  else lobby.net.send({ t: 'card', card: myCard(), name: settings.name });
 }
 
 // ---------- side panel ----------
-const SECTIONS = ['p-test', 'p-play', 'p-online', 'p-lobby', 'p-loadout', 'p-settings', 'p-help', 'p-inbox', 'p-pass', 'p-friends'];
+const SECTIONS = ['p-test', 'p-play', 'p-online', 'p-lobby', 'p-loadout', 'p-settings', 'p-help', 'p-inbox', 'p-pass', 'p-friends', 'p-profile'];
 let openSection = null;
 function openPanel(id, title, wide = false) {
   for (const p of SECTIONS) $(p).classList.toggle('hidden', p !== id);
@@ -245,6 +302,7 @@ function openPanel(id, title, wide = false) {
   if (id === 'p-inbox') renderInbox();
   if (id === 'p-pass') renderPass();
   if (id === 'p-friends') renderFriends();
+  if (id === 'p-profile') renderProfileEditor();
 }
 function closePanel(byPlayer) {
   // closing the lobby panel leaves the room, but only when the player closes it: the weekly awards popping
@@ -265,6 +323,7 @@ function show(id) { // compatibility helper used by the online code
   else if (id === 'p-lobby') openPanel('p-lobby', 'Lobby', true);
   else if (id === 'p-join') openPanel('p-online', 'Online Match');
 }
+$('profile').addEventListener('click', () => { sound.play('click'); openPanel('p-profile', 'Profile'); });
 $('panel-close').addEventListener('click', () => { sound.play('click'); closePanel(true); });
 addEventListener('keydown', e => { if (e.key === 'Escape' && !session && openSection && $('announce').classList.contains('hidden')) closePanel(true); });
 
@@ -484,7 +543,7 @@ $('pause-vol').addEventListener('input', e => { settings.vol = +e.target.value; 
 // ---------- store ----------
 // ---------- store (full screen, DbD-style) ----------
 const RARITY0 = p => p === 0 ? '' : p < 2000 ? 'common' : p < 3500 ? 'rare' : p < 5000 ? 'epic' : 'legendary';
-const RARITY = (p, sk) => sk && sk.god ? 'god' : sk && sk.limited ? 'limited' : RARITY0(p);
+const RARITY = (p, sk) => sk && sk.secret ? 'secret' : sk && sk.god ? 'god' : sk && sk.limited ? 'limited' : RARITY0(p);
 let storeTab = 'characters', storeRole = 'survivor', storeChar = null, storePreview = null;
 const ownsChapter = id => !!(profile.dlc && profile.dlc[id]);
 // ---------- killer power levels (reach in metres, bought with Embers) ----------
@@ -548,6 +607,7 @@ function renderStore() {
   else if (storeTab === 'collections') body.innerHTML = collectionsHTML();
   else if (storeTab === 'sidekicks') body.innerHTML = sidekicksHTML();
   else if (storeTab === 'app') body.innerHTML = appHTML();
+  else if (storeTab === 'codes') body.innerHTML = codesHTML();
   else body.innerHTML = charactersHTML();
   bindStore(body);
   if (menu && storeTab === 'sidekicks') { const role = storePetRole; menu.setShowcase(profile[role].char, skinId(profile[role].char), 0.3, storePet); menu.setMode('show'); menu.showFor = null; }
@@ -557,7 +617,7 @@ function chaptersHTML() { return ''; }
 function charactersHTML() {
   const chars = (storeRole === 'killer' ? Object.keys(KILLERS) : Object.keys(SURVIVORS)).filter(shownChar);
   if (!storeChar || !chars.includes(storeChar)) storeChar = profile[storeRole].char;
-  const list = SKINS[storeChar] || [];
+  const list = (SKINS[storeChar] || []).filter(sk => !sk.secret || ownsSkin(storeChar, sk)); // secret outfits only show once unlocked
   const sel = list.find(x => x.id === (storePreview || skinId(storeChar))) || list[0];
   const grid = chars.map(c => `<button class="cs-por ${c === storeChar ? 'on' : ''}" data-c="${c}"><img alt="" src="${art('portrait', c, skinId(c), 224, 224)}">${ownsChar(c) ? '' : `<i class="lock">${LIMITED(c) ? 'LIMITED' : 'DLC'}</i>`}<span>${esc(charName(c).replace(/^The /, ''))}</span></button>`).join('');
   const outfits = list.map(sk => {
@@ -573,14 +633,14 @@ function charactersHTML() {
       : locked ? `<button class="btn primary" data-tab="chapters">Get the ${esc(CHAPTERS.find(c => c.killer === storeChar).name)} chapter</button>`
       : eq ? '<span class="of-p eq" style="font-size:16px">Equipped</span>' : own ? `<button class="btn primary" data-eq="${sel.id}">Equip</button>`
       : `<span class="ch-price">${price(sel.price)}</span><button class="btn primary" data-buy="${sel.id}">Buy</button>`;
-    detail = `<div class="cs-detail ${r}"><div class="rk">${r === 'base' ? 'Default outfit' : r === 'limited' ? 'Limited edition' : r === 'god' ? 'God tier · changes how you play' : r}</div><h3>${esc(sel.name)}</h3><p>${esc(charName(storeChar))}${sel.desc ? ` · ${esc(sel.desc)}` : ''}</p><div class="row">${act}</div></div>`;
+    detail = `<div class="cs-detail ${r}"><div class="rk">${r === 'base' ? 'Default outfit' : r === 'limited' ? 'Limited edition' : r === 'god' ? 'God tier · changes how you play' : r === 'secret' ? 'Secret outfit' : r}</div><h3>${esc(sel.name)}</h3><p>${esc(charName(storeChar))}${sel.desc ? ` · ${esc(sel.desc)}` : ''}</p><div class="row">${act}</div></div>`;
   }
   return `<div class="cs-wrap"><div class="cs-roles"><button data-role="survivor" class="${storeRole === 'survivor' ? 'on' : ''}">Survivors</button><button data-role="killer" class="${storeRole === 'killer' ? 'on' : ''}">Killers</button></div>
     <div class="cs-grid">${grid}</div>
     <div class="cs-sub"><b>${esc(charName(storeChar))}</b><span>Outfits</span></div>
     <div class="cs-outfits">${outfits}</div></div>${detail}`;
 }
-const bundleOf = c => { const items = (SKINS[c] || []).filter(sk => sk.price > 0); const left = items.filter(sk => !ownsSkin(c, sk)); const full = left.reduce((a, sk) => a + sk.price, 0); return { items, left, full, price: Math.round(full * 0.75 / 50) * 50 }; };
+const bundleOf = c => { const items = (SKINS[c] || []).filter(sk => sk.price > 0 && !sk.secret); const left = items.filter(sk => !ownsSkin(c, sk)); const full = left.reduce((a, sk) => a + sk.price, 0); return { items, left, full, price: Math.round(full * 0.75 / 50) * 50 }; };
 function collectionsHTML() {
   const cards = [...Object.keys(KILLERS), ...Object.keys(SURVIVORS)].filter(shownChar).map(c => {
     const b = bundleOf(c), done = !b.left.length, locked = !ownsChar(c);
@@ -591,11 +651,72 @@ function collectionsHTML() {
   }).join('');
   return `<div class="ch-row-title">Outfit collections · every outfit for one character at 25% off</div><div class="co-grid">${cards}</div>`;
 }
+// ---------- 1.3.2: codes (secret codes, gift codes) ----------
+let giftChar = 'granny', giftSkin = '', codeMsg = null, codeTyped = ''; // kept across store redraws
+const giftable = c => (SKINS[c] || []).filter(sk => sk.price > 0 && !sk.secret);
+function codesHTML() {
+  const chars = GIFT_CHARS.filter(c => playable(c) && giftable(c).length);
+  if (!chars.includes(giftChar)) giftChar = chars[0];
+  const skins = giftable(giftChar); if (!skins.some(k => k.id === giftSkin)) giftSkin = skins[0] ? skins[0].id : '';
+  const sk = skins.find(k => k.id === giftSkin);
+  const mine = (profile.gifts || []).slice(-8).reverse();
+  return `<div class="cd-wrap">
+    <div class="cd-card"><h3>Redeem a code</h3><p>Got a gift code from a friend, or a secret code? Type it in.</p>
+      <div class="cd-row"><input id="cd-in" maxlength="20" placeholder="XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" value="${esc(codeTyped)}"><button class="btn primary" id="cd-go">Redeem</button></div><p class="cd-msg ${codeMsg ? (codeMsg.ok ? 'ok' : 'bad') : ''}" id="cd-msg">${codeMsg ? esc(codeMsg.t) : ''}</p></div>
+    <div class="cd-card"><h3>Gift an outfit</h3><p>Buy an outfit for someone else: you get a code to send them, and whoever types it in gets the outfit.</p>
+      <div class="cd-row"><select id="cd-char">${chars.map(c => `<option value="${c}" ${c === giftChar ? 'selected' : ''}>${esc(charName(c))}</option>`).join('')}</select>
+      <select id="cd-skin">${skins.map(k => `<option value="${k.id}" ${k.id === giftSkin ? 'selected' : ''}>${esc(k.name)}</option>`).join('')}</select></div>
+      ${sk ? `<div class="cd-gift"><img alt="" src="${art('portrait', giftChar, sk.id, 160, 160)}"><div><b>${esc(sk.name)}</b><small>${esc(charName(giftChar))}</small><div class="cd-buy"><span class="ch-price">${price(sk.price)}</span><button class="btn primary" id="cd-buy">Buy as a gift</button></div></div></div>` : ''}
+      ${mine.length ? `<div class="cd-list"><small>Your gift codes</small>${mine.map(g => `<div class="cd-code"><code>${esc(g.code)}</code><span>${esc(g.name)} · ${esc(charName(g.char))}</span><button class="btn" data-copy="${esc(g.code)}">Copy</button></div>`).join('')}</div>` : ''}</div>
+  </div>`;
+}
+function copyText(t) {
+  const done = () => toast('Copied ' + t);
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done, () => fallback()); return; } } catch {}
+  fallback();
+  function fallback() { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); done(); } catch { toast(t); } a.remove(); }
+}
+function redeem(input) {
+  const msg = $('cd-msg'), c = readCode(input);
+  const say = (t, ok) => { codeMsg = { t, ok }; if (ok) codeTyped = ''; if (msg) { msg.textContent = t; msg.className = 'cd-msg ' + (ok ? 'ok' : 'bad'); } };
+  if (!c) { say("That code doesn't work. Check it and try again."); sound.play('click'); return; }
+  profile.redeemed ||= {};
+  if (profile.redeemed[c.id]) { say('This code was already used on this device.'); return; }
+  if (c.kind === 'secret') {
+    if (['mara', 'eli', 'june', 'tomas'].every(ch => profile.owned[ch + ':freddy'])) { say('You already have the Freddy Fazbear outfit.'); return; }
+    for (const ch of ['mara', 'eli', 'june', 'tomas']) profile.owned[ch + ':freddy'] = true;
+    profile.redeemed[c.id] = true; saveProfile(); sound.play('escaped');
+    say('Secret unlocked: Freddy Fazbear, for all four survivors! Find him in Characters.', true);
+    toast('Secret outfit unlocked: Freddy Fazbear');
+    loadFreddy();
+    return;
+  }
+  if (profile.owned[c.char + ':' + c.skin]) { say(`You already own ${c.name} for ${charName(c.char)}. Pass the code on to someone else!`); return; }
+  profile.owned[c.char + ':' + c.skin] = true; profile.redeemed[c.id] = true; saveProfile(); sound.play('escaped');
+  say(`Gift unlocked: ${c.name} for ${charName(c.char)}!`, true); toast('Gift unlocked: ' + c.name);
+}
+function bindCodes(body) {
+  const inp = body.querySelector('#cd-in'); if (!inp) return;
+  inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') redeem(inp.value); };
+  inp.oninput = () => { codeTyped = inp.value; };
+  body.querySelector('#cd-go').onclick = () => redeem(inp.value);
+  const cs = body.querySelector('#cd-char'); if (cs) cs.onchange = () => { giftChar = cs.value; giftSkin = ''; renderStore(); };
+  const ss = body.querySelector('#cd-skin'); if (ss) ss.onchange = () => { giftSkin = ss.value; renderStore(); };
+  const buy = body.querySelector('#cd-buy'); if (buy) buy.onclick = () => {
+    const sk = giftable(giftChar).find(k => k.id === giftSkin); if (!sk) return;
+    const code = makeGift(giftChar, sk.id); if (!code) return;
+    if (!spend(sk.price, sk.name + ' (gift)')) return;
+    (profile.gifts ||= []).push({ code, char: giftChar, skin: sk.id, name: sk.name, at: Date.now() }); saveProfile();
+    renderStore(); copyText(code);
+  };
+  body.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
+}
 // ---------- sidekicks ----------
 let storePet = 'ted', storePetRole = 'survivor';
 function sidekicksHTML() { return ''; }
 
 function bindStore(body) {
+  bindCodes(body);
   body.querySelectorAll('[data-pet]').forEach(el => el.onclick = e => { if (e.target.closest('button')) return; storePet = el.dataset.pet; sound.play('hover'); renderStore(); });
   body.querySelectorAll('[data-petbuy]').forEach(b => b.onclick = () => { const id = b.dataset.petbuy; if (profile.pets[id] || !spend(SIDEKICKS[id].price, SIDEKICKS[id].name)) return; profile.pets[id] = true; profile.survivor.pet ||= id; saveProfile(); storePet = id; renderStore(); });
   body.querySelectorAll('[data-petequip]').forEach(b => b.onclick = () => { const id = b.dataset.petequip, r = b.dataset.petrole; profile[r].pet = profile[r].pet === id ? '' : id; storePet = id; storePetRole = r; saveProfile(); sound.play('click'); renderStore(); });
@@ -727,7 +848,7 @@ function botSurvivor(i, used) {
   const pool = BOT_NAMES.filter(n => !used.names.includes(n));
   const nm = pool[Math.floor(Math.random() * pool.length)] || 'Bot ' + i;
   used.names.push(nm);
-  const sk = SKINS[char]; const skin = Math.random() < 0.5 ? 'default' : sk[1 + Math.floor(Math.random() * (sk.length - 1))].id;
+  const sk = SKINS[char].slice(1).filter(k => !k.secret && !k.glb); const skin = Math.random() < 0.5 || !sk.length ? 'default' : sk[Math.floor(Math.random() * sk.length)].id; // (never the secret outfit)
   return { id: 'bot' + i, name: nm + ' (bot)', role: 'survivor', char, skin, perks: randomPerks(SURV_PERKS, PERK_SLOTS, char), item, pet: '', bot: true };
 }
 function botKiller(char, n = 0, avoid = []) {
@@ -735,7 +856,7 @@ function botKiller(char, n = 0, avoid = []) {
   const c = PLAY_K.includes(char) ? char : (pool.length ? pool : PLAY_K)[Math.floor(Math.random() * (pool.length || PLAY_K.length))];
   // a killer you picked keeps their usual look; random bots may wear an outfit, but never a god-tier one
   // (Grandpa is a whole different character)
-  const picked = char && char !== 'random' && c === char, outfits = SKINS[c].slice(1).filter(k => !k.god);
+  const picked = char && char !== 'random' && c === char, outfits = SKINS[c].slice(1).filter(k => !k.god && !k.secret);
   const skin = picked || !outfits.length || Math.random() < 0.5 ? 'default' : outfits[Math.floor(Math.random() * outfits.length)].id;
   if (window.__killerSkin) return { id: 'botk' + (n || ''), name: KILLERS[c].name, role: 'killer', char: c, skin: window.__killerSkin, perks: randomPerks(KILLER_PERKS), bot: true }; // trailer capture
   return { id: 'botk' + (n || ''), name: KILLERS[c].name, role: 'killer', char: c, skin, perks: randomPerks(KILLER_PERKS), bot: true };
@@ -1029,7 +1150,7 @@ async function startHostMatch(roster, opts) {
   loading(true, 'Entering the fog…');
   await nextFrame();
   // Chucky can appear in any match (picked, random bot killer, or an Infection turn)
-  await waitForModels({ spider: roster.some(r => r.char === 'spiderman'), granny: true, chucky: roster.some(r => r.char === 'chucky') || opts.mode === 'infection' });
+  await waitForModels({ freddy: roster.some(r => r.skin === 'freddy'), spider: roster.some(r => r.char === 'spiderman'), granny: true, chucky: roster.some(r => r.char === 'chucky') || opts.mode === 'infection' });
   loading(true, 'Entering the fog…');
   stopBG();
   $('menu').classList.add('hidden');
@@ -1113,7 +1234,7 @@ $('btn-host').addEventListener('click', async () => {
     const net = await hostRoom(mode);
     lobby = { isHost: true, net, code: net.code, mode, myId: 'host', players: [], fill: true, diff: 'normal', gm: 'classic', inGame: false, chat: [], vis: hostVis }; lobby.map = 'granny';
     const lo = profile.survivor;
-    lobby.players.push({ id: 'host', name: settings.name, role: 'survivor', char: lo.char, skin: skinId(lo.char), perks: lo.perks.slice(), pet: petOf('survivor'), host: true, loadouts: myLoadouts() });
+    lobby.players.push({ id: 'host', name: settings.name, role: 'survivor', char: lo.char, skin: skinId(lo.char), perks: lo.perks.slice(), pet: petOf('survivor'), host: true, loadouts: myLoadouts(), card: myCard() });
     net.on('msg', (id, m) => hostMsg(id, m));
     net.on('leave', id => {
       const p = lobby && lobby.players.find(x => x.id === id);
@@ -1210,9 +1331,13 @@ function hostMsg(id, m) {
     let role = m.role === 'killer' && !killerTaken ? 'killer' : 'survivor';
     if (role === 'survivor' && survCount >= cap.s) role = 'killer';
     const lo = sanitizeLoadout(role, m.loadouts?.[role]?.char, m.loadouts?.[role]?.perks);
-    lobby.players.push({ id, name: String(m.name || 'Player').slice(0, 16), role, ...lo, skin: cleanSkin(lo.char, m.loadouts?.[role]?.skin), pet: '', loadouts: m.loadouts || {} });
+    lobby.players.push({ id, name: String(m.name || 'Player').slice(0, 16), role, ...lo, skin: cleanSkin(lo.char, m.loadouts?.[role]?.skin), pet: '', loadouts: m.loadouts || {}, card: cleanCard(m.card) });
     lobby.net.send(id, { t: 'welcome', id });
     addChat(null, String(m.name || 'Player').slice(0, 16) + ' joined.');
+    broadcastLobby();
+  } else if (m.t === 'card') {
+    const p = lobby.players.find(x => x.id === id); if (!p) return;
+    p.card = cleanCard(m.card); if (m.name) p.name = String(m.name).slice(0, 16);
     broadcastLobby();
   } else if (m.t === 'vote') {
     if (lobby.voting && lobby.players.some(x => x.id === id)) lobby.voting.cast(id, String(m.map));
@@ -1280,7 +1405,7 @@ async function doJoin(code) {
     net.on('msg', m => clientMsg(m));
     net.on('closed', r => { toast(r); leaveOnline(true); });
     const role = 'survivor';
-    net.send({ t: 'hello', name: settings.name, role, loadouts: myLoadouts(), proto: NET_PROTOCOL, ver: VERSION });
+    net.send({ t: 'hello', name: settings.name, role, loadouts: myLoadouts(), proto: NET_PROTOCOL, ver: VERSION, card: myCard() });
     showLobby();
   } catch (e) { console.error(e); toast(e.message || String(e)); }
   loading(false);
@@ -1316,7 +1441,7 @@ setInterval(() => {
 async function startClientMatch(m) {
   loading(true, 'Entering the fog…');
   await nextFrame();
-  await waitForModels({ spider: (m.roster || []).some(r => r.char === 'spiderman'), granny: true, chucky: (m.roster || []).some(r => r.char === 'chucky') || m.mode === 'infection' });
+  await waitForModels({ freddy: (m.roster || []).some(r => r.skin === 'freddy'), spider: (m.roster || []).some(r => r.char === 'spiderman'), granny: true, chucky: (m.roster || []).some(r => r.char === 'chucky') || m.mode === 'infection' });
   loading(true, 'Entering the fog…');
   stopBG();
   $('menu').classList.add('hidden');
@@ -1351,7 +1476,8 @@ function renderLobby() {
   $('lobby-gm-desc').innerHTML = `<b>${esc(MODES[lobby.gm || 'classic'].name)}:</b> ${esc(gmDesc(lobby.gm))}`;
   const charName = p => (p.role === 'killer' ? KILLERS[p.char] : SURVIVORS[p.char])?.name || '';
   const slot = (p, role) => p
-    ? `<div class="slot ${role}"><span class="si">${icon(role === 'killer' ? POWER_ICON[p.char] : 'healthy')}</span><span class="nm">${esc(p.name)}${p.host ? ' · Host' : ''}${p.id === lobby.myId ? ' (you)' : ''}</span><span class="ch">${esc(charName(p))}</span></div>`
+    ? (() => { const cd = cleanCard(p.card), bn = cd && PROFILE_BANNERS[cd.bn];
+      return `<div class="slot ${role}${cd ? ' carded' : ''}"${bn ? ` style="--ban-a:${bn.a};--ban-b:${bn.b}"` : ''}>${cd ? `<img class="sav" alt="" src="${art('portrait', cd.av, cd.avs, 96, 96)}">` : `<span class="si">${icon(role === 'killer' ? POWER_ICON[p.char] : 'healthy')}</span>`}<span class="nm">${esc(p.name)}${p.host ? ' · Host' : ''}${p.id === lobby.myId ? ' (you)' : ''}${cd ? `<small class="stt">${esc(titleName(cd.tt))}${cd.mo ? ' · "' + esc(cd.mo) + '"' : ''}</small>` : ''}</span><span class="ch">${esc(charName(p))}</span></div>`; })()
     : `<div class="slot ${role} empty"><span class="si">${icon(role === 'killer' ? 'warrant' : 'healthy')}</span><span class="nm">${lobby.fill ? (role === 'killer' ? 'Bot killer' : 'Bot survivor') : 'Empty slot'}</span></div>`;
   let html = '';
   for (let i = 0; i < cap.k; i++) html += slot(killers[i], 'killer');

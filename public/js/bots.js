@@ -303,7 +303,7 @@ export class Bots {
       // (running for their life, they often don't look down)
       // a trap we have spotted gets a wide berth; one we haven't, we may not see in time when running
       for (const t of S.bears) {
-        const known = b.traps && b.traps.has(t.id), R0 = known ? 2.1 : 1.5;
+        const known = b.traps && b.traps.has(t.id), R0 = known ? (b.brave > S.t ? 1.0 : 2.1) : 1.5;
         if (!known && sprint && ((t.id * 7 + p.id.charCodeAt(p.id.length - 1)) % 10) < 6) continue;
         const dx = p.x - t.x, dz = p.z - t.z, d = Math.hypot(dx, dz);
         if (d < R0 && d > 0.01 && (t.fl || 0) === (p.fl || 0)) { const k = (R0 - d) / R0 * (known ? 2.4 : 1.8); mx += dx / d * k; mz += dz / d * k; }
@@ -353,6 +353,9 @@ export class Bots {
         wd.t = 0;
         if (b.mode && b.mode !== 'rescue' && b.mode !== 'exit') (b.avoid ||= {})[b.mode + ':' + b.modeId] = S.t + 15;
         b.path = null; b.repath = 0; b.side = 0.7; b.sideDir = null; b.goalKey = '';
+        // (a known bear trap beside the only way in, e.g. at a hook, held us back: squeeze past it for a bit,
+        // still well clear of its jaws)
+        b.brave = S.t + 6;
       }
     }
     const avoid = (mode, id) => !!(b.avoid && b.avoid[mode + ':' + id] > S.t);
@@ -382,8 +385,16 @@ export class Bots {
       if (K.carry != null && kd > 6) threat = false;
     }
     if (threat) { b.react += dt; b.alert = 5; b.kLast = { x: K.x, z: K.z, t: S.t }; } else { b.react = 0; b.alert = Math.max(0, (b.alert || 0) - dt); }
+    // 1.3.2: the team shares what it knows. Whoever sees the killer (or hears the heartbeat close by) "calls it out":
+    // every survivor bot then knows roughly where she is, and whether she is busy chasing someone
+    if (K && (kd < 26 && !losBlocked(M, p.x, p.z, K.x, K.z) || kd < Math.min(terrorRadius(K), 16))) {
+      const I = this.intel ||= {};
+      if (threat || !I.t || S.t - I.t > 1 || I.by === p.id) Object.assign(I, { x: K.x, z: K.z, t: S.t, by: p.id, chase: threat ? p.id : (I.chase === p.id ? null : I.chase), ct: threat ? S.t : I.ct });
+    }
     // the terror radius: leave a generator early if the killer is closing in
-    if (!threat && K && p.act && p.act.k === 'repair' && kd < Math.min(terrorRadius(K), 18) && K.carry == null && !(K.char === 'wisp' && K.ab === 1)) {
+    const I = this.intel && S.t - this.intel.t < 20 ? this.intel : null;
+    const busyElsewhere = !!(I && I.chase && I.chase !== p.id && S.t - (I.ct || 0) < 4 && kd > 20);
+    if (!threat && !busyElsewhere && K && p.act && p.act.k === 'repair' && kd < Math.min(terrorRadius(K), 18) && K.carry == null && !(K.char === 'wisp' && K.ab === 1)) {
       const kv = b.kPrevD != null ? b.kPrevD - kd : 0;
       if (kv > 0.02 && kd < 14) { b.react = D.react; b.alert = 4; b.kLast = { x: K.x, z: K.z, t: S.t }; }
     }
@@ -420,8 +431,9 @@ export class Bots {
 
     // pick a goal
     let goal = null;
-    // keep doing the current action
-    if (p.act) { this.setE(p, b, true); this.move(p, b, 0, 0, dt, false); return; }
+    // keep doing the current action (a repair pauses for an injured teammate standing right here, when it's safe)
+    if (p.act && p.act.k === 'repair' && (!K || kd > 20 || busyElsewhere) && S.players.some(o => o !== p && o.role === 'survivor' && o.st === 'ok' && o.hp === 1 && !o.act && dist(p, o) < 3 && !avoid('heal', o.id))) this.setE(p, b, false);
+    else if (p.act) { this.setE(p, b, true); this.move(p, b, 0, 0, dt, false); return; }
 
     const others = S.players.filter(o => o.role === 'survivor' && o !== p);
     // rescue caged teammates when the killer is away from the cage
@@ -449,8 +461,24 @@ export class Bots {
       }
     }
     // heal injured teammates nearby (or get healed)
-    if (!goal && (!K || kd > 20)) {
-      for (const o of others) if (o.st === 'ok' && o.hp === 1 && dist(p, o) < 14 && !o.act && !avoid('heal', o.id)) { goal = { mode: 'heal', modeId: o.id, x: o.x, z: o.z, kind: 'heal', id: o.id }; break; }
+    // 1.3.2: they used to heal about once a match, so every injured bot went down on the next hit
+    const safeish = !K || kd > 20 || (busyElsewhere && kd > 14);
+    if (p.hp !== 1) b.waitT = 0;
+    if (!goal && safeish) {
+      let bestO = null, bd = 25;
+      for (const o of others) if (o.st === 'ok' && o.hp === 1 && dist(p, o) < bd && (!o.act || o.act.k === 'repair') && !avoid('heal', o.id) && !(K && dist(K, o) < 14)) { bd = dist(p, o); bestO = o; }
+      if (bestO) goal = { mode: 'heal', modeId: bestO.id, x: bestO.x, z: bestO.z, kind: 'heal', id: bestO.id };
+    }
+    // injured: go to the nearest healthy teammate (who then heals us), unless a generator is nearly done
+    if (!goal && p.hp === 1 && safeish && !avoid('gethealed', 0)) {
+      let mate = null, md = 45;
+      for (const o of others) if (o.st === 'ok' && o.hp >= 2 && dist(p, o) < md && !(K && dist(K, o) < 16)) { md = dist(p, o); mate = o; }
+      if (mate && md > 2.2) goal = { mode: 'gethealed', modeId: 0, x: mate.x, z: mate.z, kind: 'meet' };
+      else if (mate) { // wait beside them a moment
+        b.mode = 'gethealed'; b.modeId = 0; b.waitT = (b.waitT || 0) + dt;
+        if (b.waitT > 3) { (b.avoid ||= {})['gethealed:0'] = S.t + 20; b.waitT = 0; }
+        this.setE(p, b, false); this.move(p, b, 0, 0, dt, false); return;
+      }
     }
     // a chest nearby: search it, and take what's in it if it beats what we're holding
     if (!goal && !threat && M.chests && S.chests) {
@@ -472,6 +500,19 @@ export class Bots {
         let score = -Math.hypot(g.x - p.x, g.z - p.z) + gs.p * 30 + (mates === 1 && gs.p > 0.5 ? 6 : 0) - mates * 12 - (gs.reg ? 0 : 0);
         if (K) { const kd2 = Math.hypot(K.x - g.x, K.z - g.z); if (kd2 < 16) score -= (16 - kd2) * 3; }
         if (b.kLast && S.t - b.kLast.t < 25) { const kd3 = Math.hypot(b.kLast.x - g.x, b.kLast.z - g.z); if (kd3 < 18) score -= (18 - kd3) * 2; }
+        // 1.3.2: where the team last saw her (older news counts for less)
+        if (I) { const ki = Math.hypot(I.x - g.x, I.z - g.z), fresh = 1 - (S.t - I.t) / 20; if (ki < 20) score -= (20 - ki) * 1.6 * fresh; }
+        // split up: a generator another bot is already walking to is taken (unless it's nearly done),
+        // and generators right next to teammates count for less: four survivors on four generators
+        let claims = 0, near = 99;
+        for (const o of S.players) {
+          if (o === p || o.role !== 'survivor' || o.st !== 'ok') continue;
+          const ob = o.bot && this.brains.get(o.id);
+          if (ob && ob.mode === 'repair' && ob.modeId === g.id && Math.hypot(o.x - g.x, o.z - g.z) >= 3) claims++;
+          near = Math.min(near, Math.hypot(o.x - g.x, o.z - g.z));
+        }
+        score -= claims * (gs.p > 0.75 ? 4 : 11);
+        if (near >= 3 && near < 12) score -= (12 - near) * 0.7;
         if (b.modeId === g.id && b.mode === 'repair') score += 8;
         if (score > bs) { bs = score; best = g.id; }
       }
@@ -553,8 +594,8 @@ export class Bots {
           if (Math.abs(tx) > (M.half || HALF) - 1.5 || Math.abs(tz) > (M.half || HALF) - 1.5 || !free(tx, tz)) continue;
           const dm = Math.hypot(tx - p.x, tz - p.z), dk = Math.hypot(tx - K.x, tz - K.z);
           if (dk < dm + 0.5) continue; // never run toward the killer
-          let sc = dk - dm * 0.6 + (losBlocked(M, K.x, K.z, tx, tz) ? 7 : 0) + (A.win ? 3 : 0) + (A.bar != null ? (S.bars[A.bar] === 0 ? 9 : 4) : 0) + Math.random() * 1.5;
-          if (b.anchor === A) sc += 4; // keep looping the same structure
+          let sc = dk - dm * 0.6 + (losBlocked(M, K.x, K.z, tx, tz) ? 7 : 0) + (A.win ? 3 : 0) + (A.bar != null ? (S.bars[A.bar] === 0 ? 9 : 4) : 0) + Math.random() * 1.5 - this.leadPenalty(p, tx, tz);
+          if (b.anchor === A) sc += losBlocked(M, K.x, K.z, p.x, p.z) ? 7 : 4; // keep looping the same structure (more so while it hides us)
           if (dm < 1.6) continue;      // already here: pick the next side
           if (sc > bs) { bs = sc; best = { x: tx, z: tz, A }; }
         }
@@ -567,7 +608,7 @@ export class Bots {
           const cx = p.x + Math.sin(a) * r, cz = p.z + Math.cos(a) * r;
           if (Math.abs(cx) > (M.half || HALF) - 2 || Math.abs(cz) > (M.half || HALF) - 2 || !free(cx, cz)) continue;
           const dk = Math.hypot(cx - K.x, cz - K.z);
-          const sc = dk - r * 0.4 + (losBlocked(M, K.x, K.z, cx, cz) ? 5 : 0) + Math.random() * 2 - (best && kd <= 14 ? 6 : 0);
+          const sc = dk - r * 0.4 + (losBlocked(M, K.x, K.z, cx, cz) ? 5 : 0) + Math.random() * 2 - (best && kd <= 14 ? 6 : 0) - this.leadPenalty(p, cx, cz);
           if (sc > bs) { bs = sc; best = { x: cx, z: cz, A: null }; }
         }
       }
@@ -587,6 +628,12 @@ export class Bots {
     this.follow(p, b, dt, true);
   }
 
+  // a chased survivor keeps away from teammates working on generators (it would bring the killer to them)
+  leadPenalty(p, x, z) {
+    let pen = 0;
+    for (const o of this.sim.S.players) if (o !== p && o.role === 'survivor' && o.st === 'ok' && o.act && o.act.k === 'repair') { const d = Math.hypot(x - o.x, z - o.z); if (d < 12) pen += (12 - d) * 0.9; }
+    return pen;
+  }
   // easier bot killers don't take every opening: a fresh yes/no every 1.5s, likelier the harder the bot
   willing(b, D, dt) {
     b.willT = (b.willT || 0) - dt;

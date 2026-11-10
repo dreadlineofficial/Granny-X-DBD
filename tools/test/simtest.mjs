@@ -36,7 +36,7 @@ window.run = (map, killer, minutes, diff, seed) => {
       still.set(p.id, w);
     }
   }
-  const res = { t: +t.toFixed(0), phase: S.phase, gens: S.gensDone, need: S.gensNeeded, out: S.players.filter(p => p.role === 'survivor').map(p => p.st + (p.outcome ? ':' + p.outcome : '')), evc: { hit: evc.hit, shot: evc.shot, died: evc.died, escaped: evc.escaped, bearset: evc.bearset, bearsnap: evc.bearsnap, haunt: evc.haunt, hauntfail: evc.hauntfail, gaze: evc.gaze, cursed: evc.cursed, doomed: evc.doomed, bearfail: evc.bearfail, spotted: evc.spotted, lullaby: evc.lullaby, beam: evc.beam }, stalls: log, stallSec: +stallSec.toFixed(0), insideT: +insideT.toFixed(0), upT: +upT.toFixed(0), falls, houseGen: hg ? (S.gens[hg.id].done ? 'DONE' : S.gens[hg.id].p.toFixed(2)) : 'none' };
+  const res = { t: +t.toFixed(0), phase: S.phase, gens: S.gensDone, need: S.gensNeeded, out: S.players.filter(p => p.role === 'survivor').map(p => p.st + (p.outcome ? ':' + p.outcome : '')), evc, stalls: log, stallSec: +stallSec.toFixed(0), insideT: +insideT.toFixed(0), upT: +upT.toFixed(0), falls, houseGen: hg ? (S.gens[hg.id].done ? 'DONE' : S.gens[hg.id].p.toFixed(2)) : 'none' };
   return res;
 };
 window.ready = true;

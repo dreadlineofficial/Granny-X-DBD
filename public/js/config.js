@@ -136,7 +136,7 @@ export const KILLERS = {
     lore: '',
     exec: { name: 'Bedtime Trap', desc: 'Forces the survivor to their knees, sets a bear trap in front of them, and shoves their face into it.' },
     shotgun: { name: 'Shotgun', cooldown: 2.2, raise: 0.3, range: 45, minDmg: 6, maxDmg: 36, near: 2.5, far: 22.5 },
-    ability: { name: 'Bat Rush', cooldown: 8, minCharge: 0.25, maxCharge: 1.0, minDist: 3, maxDist: 8, speed: 13, turn: 1.9, palletBonus: 2, slamRadius: 2.6, slamGen: 0.1, wallStun: 0.9, desc: 'Hold to wind up the bat (slowed), release to charge: the longer you hold, the further she goes (3m, 8m at one second, and on), up to her power level (25m to start, 50m fully levelled). Steer the charge with the mouse. She crashes straight through windows and smashes dropped pallets (each one carries her 2m further), and strikes the first survivor in her way; a Heard survivor goes straight down. Fully wound up, the charge ends in a Ground Slam: everyone around her is struck and a nearby generator is damaged. Charging into a wall stuns her.' },
+    ability: { name: 'Bat Rush', cooldown: 8, minCharge: 0.25, maxCharge: 1.0, minDist: 3, maxDist: 8, speed: 13, turn: 1.9, palletBonus: 2, slamRadius: 2.6, slamGen: 0.1, wallStun: 0.9, desc: 'Hold to wind up the bat (slowed), release to charge: the longer you hold, the further she goes (3m, 8m at one second, and on), up to her power level (25m to start, 50m fully levelled). Steer the charge with the mouse. She crashes straight through windows and smashes dropped pallets (each one carries her 2m further), and strikes the first survivor in her way; a Heard survivor goes straight down. Fully wound up, the charge ends in a Ground Slam: everyone healthy around her is injured (the slam never downs anyone) and a nearby generator is damaged. Charging into a wall stuns her.' },
     ability2: { name: 'I Hear You', key: 'R', cooldown: 25, reveal: 6, heard: 15, desc: 'Stop and listen. Every survivor who is running, repairing, healing or unhooking anywhere on the map is revealed for 6s and Heard for 15s: her next hit on a Heard survivor puts them straight down.' },
     teleport: { name: 'Creep', key: 'G', cooldown: 25, time: 1.2, haste: 3, desc: 'Hold G: every window, pallet, generator and hook on the map is marked. Release to vanish and reappear at the one in your sights, with a short burst of speed.' },
     swap: { name: 'Body Swap', key: 'V', cooldown: 6, desc: 'Switch bodies with Spider Mom, any time: Granny appears where Spider Mom was, and Spider Mom where Granny stood. Hold V to look through Spider Mom\'s eyes first, release to swap.' },
@@ -266,24 +266,28 @@ export const SKINS = {
     { id: 'nightshift', name: 'Night Shift', price: 1500, shirt: 0x2a2e38, pants: 0x15171c, hair: 0x0e0b0a, desc: 'Ball cap, head torch and a scarf against the cold.', fx: [['cap', { color: 0x1a1e26 }], 'headlamp', ['scarf', { color: 0x4a1a1a }]] },
     { id: 'crimson', name: 'Crimson Hood', price: 2500, shirt: 0x6a0d10, pants: 0x222222, desc: 'A blood-red riding cloak, hood up. Not all of the red is dye.', fx: [['hood', { color: 0x6a0a0c }], ['cloak', { color: 0x6a0a0c, flare: 1.8 }], 'blood'] },
     { id: 'medic', name: 'Trauma Medic', price: 4000, shirt: 0xd8d4c8, pants: 0x2a3a4a, desc: 'Gas mask, plate carrier and a field medic pack. Ready for anything.', fx: [['gasmask', { color: 0x2a2e2a }], ['armor', { color: 0x3a4a3a, patch: 0xd02020 }], ['backpack', { color: 0xd8d4c8, cross: true }]] },
+    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'The pizzeria\'s star performer, still running after closing time. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   eli: [
     { id: 'default', name: 'Hoodie', price: 0 },
     { id: 'overalls', name: 'Grease Monkey', price: 1500, shirt: 0x2f4a6a, pants: 0x2f4a6a, desc: 'Beanie, welding goggles and a belt full of tools.', fx: [['beanie', { color: 0x8a2a1a }], ['goggles', { color: 0x3a8a9a }], 'toolbelt'] },
     { id: 'hazard', name: 'Hazard Crew', price: 2500, shirt: 0x3a3a3a, pants: 0x2a2a2a, desc: 'Hard hat with a lamp, respirator and a hi-vis vest.', fx: [['hardhat', { color: 0xe0b020, lamp: true }], ['respirator', { filter: 0xd06020 }], ['hivis', { color: 0xf0a020 }]] },
     { id: 'midnight', name: 'Midnight Run', price: 4000, shirt: 0x14141c, pants: 0x14141c, desc: 'Hood up, hockey mask down, eyes that catch the light.', fx: [['hood', { color: 0x14141c }], ['hockey', { color: 0xe8e4d8, chevron: 0xc01a1a }], ['eyes', { color: 0x6affff }]] },
+    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'The pizzeria\'s star performer, still running after closing time. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   june: [
     { id: 'default', name: 'Knit Sweater', price: 0 },
     { id: 'autumn', name: 'Autumn Coat', price: 1500, shirt: 0x8a4a20, pants: 0x2a2018, desc: 'Long wool coat, beanie and her camera.', fx: [['coat', { color: 0x6a3a1a }], ['beanie', { color: 0xa06030 }], 'camera'] },
     { id: 'ghost', name: 'Ghost Story', price: 2500, shirt: 0xdedad2, pants: 0x3a3a40, hair: 0xe8e0c8, desc: 'She went into the lake to get the photo. Something came back out.', fx: [['ghost', { color: 0xa8d8ff, op: 0.55 }], ['veil', { color: 0xdfe8ff, op: 0.4, len: 7, wide: 2.4 }], ['eyes', { color: 0x9ae0ff }]] },
     { id: 'reporter', name: 'Field Reporter', price: 4000, shirt: 0x4a5a3a, pants: 0x1c1c18, desc: 'Press vest, head torch, camera and a pack full of tapes.', fx: [['armor', { color: 0x3a4a6a, patch: 0xe8e8e8 }], 'headlamp', 'camera', ['backpack', { color: 0x3a3a2a, radio: true }]] },
+    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'The pizzeria\'s star performer, still running after closing time. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   tomas: [
     { id: 'default', name: 'Ranger', price: 0 },
     { id: 'camo', name: 'Woodland Camo', price: 1500, shirt: 0x3a4a2a, pants: 0x2a3020, desc: 'Boonie hat, ghillie strips and a heavy pack.', fx: [['boonie', { color: 0x4a5236 }], ['moss', { color: 0x4a5a2a, glow: 0x000000 }], ['backpack', { color: 0x3a4228 }]] },
     { id: 'firewatch', name: 'Firewatch', price: 2500, shirt: 0xb04020, pants: 0x2a2018, desc: 'Red helmet, smoke goggles and a fire axe across his back.', fx: [['hardhat', { color: 0xb02010 }], ['goggles', { color: 0xd08020, down: true }], 'axe', ['scarf', { color: 0xd8c8a0 }]] },
     { id: 'searchlight', name: 'Search & Rescue', price: 4000, shirt: 0xd86a10, pants: 0x1a1a22, desc: 'Helmet lamp, hi-vis vest and a radio pack with a blinking beacon.', fx: [['hardhat', { color: 0xf0f0f0, lamp: true }], ['hivis', { color: 0xe8e020 }], ['backpack', { color: 0xc04010, radio: true }]] },
+    { id: 'freddy', name: 'Freddy Fazbear', price: 9000, secret: true, glb: 'freddy', desc: 'The pizzeria\'s star performer, still running after closing time. Unlocked with a secret code. (Model: "FNaF 1 Freddy Fazbear Rigged" by ShadowSupreme, Sketchfab.)' },
   ],
   raghuvir: [
     { id: 'default', name: 'Ghostbuster', price: 0, desc: 'Khaki flight suit, proton pack, name tag. Who you gonna call?', fx: [['face', { kind: 'r', skin: 0xb08058 }], 'fringehair', 'specs', ['protonpack', {}], ['nametag', {}], ['wand', {}]] },
@@ -379,10 +383,21 @@ export const NEWSLETTER = '';
 export const PLAY_K = ['granny', 'grandpa', 'slendrina', 'angeline'], PLAY_S = ['mara', 'eli', 'june', 'tomas'];
 export const playable = c => PLAY_K.includes(c) || PLAY_S.includes(c);
 export const DISCORD = 'https://discord.gg/WXvAJ2sgVP';
-export const VERSION = '1.3.0';
+export const VERSION = '1.3.2';
 // Inbox entries with `email: true` are big updates: they are emailed to newsletter subscribers
 // automatically (tools/email-updates.mjs). Small tweaks leave it out and are never mailed.
 export const INBOX = [
+  {
+    id: 'gdbd132', version: '1.3.2', date: 'Nov 2026', title: 'Profiles, gifts and smarter bots', tag: 'Update',
+    gift: { embers: 1000, label: 'Update gift: 1,000 Embers' },
+    body: [
+      'Your own profile card: click your name (top right) to pick an avatar, a banner, a title and a motto. Everyone in your lobby sees it.',
+      'Gift outfits: Store > Codes. Buy an outfit as a gift and send the code to a friend; type a code in to redeem it. (There may be a secret or two to find in there.)',
+      'Smarter bots: survivors split up across the generators, tell each other where the killer is, heal each other, loop around walls and pallets, and stop leading the killer to their friends.',
+      "Granny's Ground Slam can only injure now: it never puts anyone down.",
+      'Smoother loading into a match, and the loading screen no longer shows the menu through it.',
+    ],
+  },
   {
     id: 'gdbd13', version: '1.3.0', date: 'Nov 2026', title: 'Angeline arrives', tag: 'Update',
     gift: { embers: 1500, label: 'Update gift: 1,500 Embers' },
@@ -427,3 +442,27 @@ export const INBOX = [
     ],
   },
 ];
+
+// ---------- 1.3.2: profile cards, secret codes, gift codes ----------
+export const PROFILE_BANNERS = {
+  blood: { name: 'Blood', a: '#6a0e0e', b: '#160405' }, midnight: { name: 'Midnight', a: '#1a2a4a', b: '#05070d' },
+  moss: { name: 'Moss', a: '#2a3e1e', b: '#070a05' }, bone: { name: 'Bone', a: '#5e5444', b: '#141210' },
+  ember: { name: 'Ember', a: '#7a3a10', b: '#140804' }, violet: { name: 'Violet', a: '#422058', b: '#0a050f' },
+  gold: { name: 'Gold', a: '#76601c', b: '#141005' }, ash: { name: 'Ash', a: '#3a3a3e', b: '#0a0a0c' },
+};
+// titles: `need(stats, profile)` unlocks it; no `need` = free
+export const PROFILE_TITLES = {
+  fog: { name: 'Lost in the Fog' }, guest: { name: "Granny's Guest" }, night: { name: 'Night Owl' }, creak: { name: 'Creaky Floorboard' },
+  escape: { name: 'Escape Artist', hint: '10 escapes', need: st => (st.escapes || 0) >= 10 },
+  hunter: { name: 'The Hunter', hint: '10 kills', need: st => (st.kills || 0) >= 10 },
+  regular: { name: 'Regular', hint: '25 matches', need: st => (st.matches || 0) >= 25 },
+  veteran: { name: 'Veteran of the House', hint: '100 matches', need: st => (st.matches || 0) >= 100 },
+  hoarder: { name: 'Ember Hoarder', hint: 'hold 10,000 Embers', need: st => (st.embers || 0) >= 10000 },
+  gifter: { name: 'Generous', hint: 'gift an outfit', need: (st, P) => !!(P.gifts && P.gifts.length) },
+  showtime: { name: "It's Showtime", hint: 'a secret', secret: true, need: (st, P) => !!(P.owned && P.owned['mara:freddy']) },
+};
+// SHA-256 of 'gdbd-showbear:' + code (they unlock the Freddy Fazbear outfit) (no dashes): the codes themselves are not in the game
+export const SECRET_CODES = ["a6fb993d580ca12455d500af871be912e902f2ed21e22e270ca4c5833b09439d", "acf3b8fe9a31f8d8625419ab93a1681e3811330d23e013bcf2965c2ec657aaae", "52517749c1e9d61e4b1c580b718f8e9082446bd4d0bce3755cbc6918d6c755dc", "bd5977e481fdafa95fc238758c7ac53c030a5d241a3cb27b1d42d2aa01d5adcd", "11eea88346def0fb7e43a7b450776842f99f3307859d9b6282a31961bae1dc25", "56f719f05edae38085c1073e6b2c3de395ae0107b3644f984d83a9d5f8a2190f", "7bff9130dc1416c1a7d925add43aa660daf01a1dc2f1a0d839ef6d796523cc0a", "aa0ec1e4854f2e5df076d40da49aa8e735aa7c8ad61e99201a792271145282b4", "617dde538cb62f8050b88286870607fc05f40b6be75e3998f9f1f0095a1a8849", "445358acb7fba3b30c076874c6e309a63be51647781d474abc3316376d947ee7"];
+// gift codes name a character by its place in this list and an outfit by its place in SKINS[char]:
+// only ever add to the END of both, or old gift codes would turn into different outfits
+export const GIFT_CHARS = ['mara', 'eli', 'june', 'tomas', 'granny', 'grandpa', 'slendrina', 'angeline'];

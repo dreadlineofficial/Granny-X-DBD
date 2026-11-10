@@ -1,0 +1,23 @@
+// 1920x1080 shots of the 1.3.2 menus for the trailer: the profile panel and Store > Codes (no secret outfit owned)
+import { chromium } from 'playwright';
+import http from 'node:http'; import { readFile } from 'node:fs/promises'; import { join, extname } from 'node:path';
+const ROOT = '/home/user/granny-x-dbd', OUT = '/tmp/claude-0/tr/ui';
+const MIME = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg' };
+const srv = http.createServer(async (q, r) => { let u = decodeURIComponent(q.url.split('?')[0]); try { const b = await readFile(join(ROOT, u)); r.writeHead(200, { 'content-type': MIME[extname(u)] || 'application/octet-stream' }); r.end(b); } catch { r.writeHead(404); r.end(); } }).listen(0);
+const br = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+const ctx = await br.newContext({ viewport: { width: 1920, height: 1080 } });
+await ctx.addInitScript(() => { localStorage.setItem('gdbd_profile', JSON.stringify({ seen: { intro: true, help: true, tut: true, granny: true }, stats: { embers: 12450, matches: 128, escapes: 41, kills: 37 }, killer: { char: 'granny', perks: [] }, survivor: { char: 'june', perks: [] }, card: { av: 'granny', bn: 'blood', tt: 'veteran', mo: 'Shh. She can hear you.' }, gifts: [{ code: 'KDE7-W2QM-9TXA', char: 'angeline', skin: 'pale', name: 'Pale', at: 1 }], readInbox: { gdbd132: true, gdbd13: true, gdbd12: true } })); localStorage.setItem('gdbd_settings', JSON.stringify({ quality: 'low', name: 'Froody' })); window.__nbNoRTC = true; window.__nbMqtt = ['ws://127.0.0.1:1']; });
+const pg = await ctx.newPage();
+await pg.goto(`http://localhost:${srv.address().port}/public/index.html`, { timeout: 300000 });
+await pg.waitForFunction(() => window.__nb && document.getElementById('loading').classList.contains('hidden'), null, { timeout: 400000 });
+await pg.addStyleTag({ content: '#announce{display:none!important} #toast{display:none!important}' });
+await pg.waitForTimeout(4000);
+await pg.screenshot({ path: OUT + '-menu.png', timeout: 180000 });
+await pg.click('#profile'); await pg.waitForTimeout(2500);
+await pg.screenshot({ path: OUT + '-profile.png', timeout: 180000 });
+await pg.evaluate(() => document.getElementById('panel-close').click()); await pg.waitForTimeout(400);
+await pg.evaluate(() => document.querySelector('#mainnav button[data-act="store"]').click()); await pg.waitForTimeout(1200);
+await pg.evaluate(() => document.querySelector('#st-tabs [data-t="codes"]').click()); await pg.waitForTimeout(800);
+await pg.selectOption('#cd-char', 'granny'); await pg.waitForTimeout(500); await pg.selectOption('#cd-skin', 'ghost'); await pg.waitForTimeout(2500);
+await pg.screenshot({ path: OUT + '-codes.png', timeout: 180000 });
+console.log('ok'); await br.close(); srv.close();

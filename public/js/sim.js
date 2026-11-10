@@ -1006,18 +1006,20 @@ export class Sim {
     if (chasing) K.score.c += dt * 5;
   }
 
-  damage(s, K, instantDown) {
+  // injureOnly: a healthy survivor is injured, an injured one is left alone (Granny's Ground Slam since 1.3.2)
+  damage(s, K, instantDown, injureOnly) {
     if (K && K.harmless) return;
+    if (injureOnly) { if (s.hp <= 1 || s.st !== 'ok') return; instantDown = false; }
     if (K && (!levelsMeet(K, s) || (this.M.stairs && Math.abs(heightAt(this.M, K) - heightAt(this.M, s)) > 1.7))) return; // a floor apart // Chucky's empty doll can chase, but not hurt
     if (s.st === 'ghost') return;
     if (s.perchT > 0 && s.perchY > 1.2) return; // up on a wall or in a tree: out of reach
     if (K && K.char === 'foreman' && K.ab === 1 && !this.chainDmg) instantDown = true;
     // (slimed survivors are slowed and revealed, not one-shot: that made him unbeatable) // one strike from the hook, in the dark
     s.act = null; s.prog = 0;
-    if (K && K.char === 'granny' && s.heard > 0) { instantDown = true; s.heard = 0; }
+    if (K && K.char === 'granny' && s.heard > 0 && !injureOnly) { instantDown = true; s.heard = 0; }
     if (K && K.char === 'slendrina' && s.doomed > 0) { instantDown = true; s.doomed = 0; s.curse = 0; }
     if (K && K.char === 'angeline' && s.spotted > 0) { instantDown = true; s.spotted = 0; s.spotT = 0; }
-    if (this.mode === 'glass') instantDown = true; // Glass Bones: every hit downs
+    if (this.mode === 'glass' && !injureOnly) instantDown = true; // Glass Bones: every hit downs
     if (K && K.disguise) (s.knows ||= {})[K.id] = true; // hit by the 'survivor' Chucky is wearing: now they know // I Hear You: she knew exactly where you were
     const wasHp = s.hp;
     s.hp = instantDown ? 0 : s.hp - 1;
@@ -1674,7 +1676,8 @@ export class Sim {
     for (const s of S.players) {
       if (s.id === skip || s.role !== 'survivor' || s.st !== 'ok' || !levelsMeet(K, s)) continue;
       if (M.stairs && Math.abs(heightAt(M, K) - heightAt(M, s)) > 1.7) continue;
-      if (Math.hypot(s.x - K.x, s.z - K.z) < D.slamRadius && !losL(M, K, s, 1.0)) { this.damage(s, K, false); hit.push(s.id); }
+      // the slam can injure, never down (1.3.2: it used to finish injured survivors too)
+      if (Math.hypot(s.x - K.x, s.z - K.z) < D.slamRadius && !losL(M, K, s, 1.0) && s.hp > 1) { this.damage(s, K, false, true); hit.push(s.id); }
     }
     if (!K.fl) for (const g of M.gens) { const gs = S.gens[g.id]; if (!gs.done && gs.p > 0 && Math.hypot(g.x - K.x, g.z - K.z) < D.slamRadius + 0.8) { gs.p = Math.max(0, gs.p - D.slamGen); gs.reg = true; this.ev({ k: 'kick', id: g.id }); } }
     this.ev({ k: 'slam', id: K.id, x: K.x, z: K.z, hit });
