@@ -175,7 +175,24 @@ The owner calls the current version **1.3.0**: keep `VERSION` '1.3.0' and label 
 Nov 2026 rebuild (1.3.0): Windows exe launch fix (`executableName`), new startup splash (NSIS splash.bmp + in-app splash
 window), installer build, APK versionCode 15 / versionName 1.3.0 signed with grannyxdbd-1.3.jks (installs over 1.3.x).
 
+Nov 2026 fixes (APK versionCode 16): loading screen no longer shows the menu through it (`html.ls-up` hides every body
+child but #game/#loading/#toast); `Game.warmUp()` runs behind the loading screen before the first match frame (characters
+created with drawing off, textures via `initTexture`, shaders via `compileAsync` when KHR_parallel_shader_compile exists,
+then one real frame): the first frame used to compile ~85 shaders + upload ~120 textures at once (37 s in SwiftShader);
+the loading screen renders with its own `shadowMap.enabled` (= !lite) so menu/match switches don't recompile its shaders;
+WebGL context lost/restored handler in main.js (`watchContext`): rebuilds the PMREM night-sky env maps (`refreshEnvs` in
+gfx.js) and reloads the page if the context isn't back in 12 s; KTX2 scans with sizes not a multiple of 4 (hessian_230,
+rough_linen) are dropped (black on BC GPUs); `closePanel(byPlayer)`: only the player closing the lobby panel leaves the
+room (the weekly-awards popup used to kick people out of a lobby they joined during startup, e.g. invite links).
+granny_map.glb has 7 zero-length images (Button, ShotgunAmmo, Slingshot, Teddy, Coconut, GoldCoin, GateControlFuse_1): those
+props render untextured (white). New checks in tools/test: `diag.mjs <killer> <map> <quality>` (load time, longest frame
+stalls, texture/program counts), `ctxloss.mjs` (lose + restore the context mid-match), `lsover.mjs` (loading screen over
+the menu), `onlinestart.mjs` (host + client start a match through the local broker; run `node broker.mjs` first).
+
 ## Where things stand / next steps
+- The "textures go missing / very dark" report (EXE + APK) is not reproduced in SwiftShader; fixes above cover the likely
+  causes (GPU reset after the long first frame, context loss on phones). Ask the owner for a screenshot + quality setting
+  if it still happens.
 - The 1.3.x APKs are signed with a key made in the 1.3 session (`grannyxdbd-1.3.jks`, alias `grannyxdbd`), which was handed
   to the owner as a file together with its password file. For the next APK the owner puts that .jks in `tools/android/` (or
   passes `KS=/path`) and sets `KS_PASS` from the password file, so the update installs over 1.3.x. Never ask for the password

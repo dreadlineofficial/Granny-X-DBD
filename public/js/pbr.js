@@ -49,6 +49,10 @@ function load(n) {
   if (pending.has(n)) return pending.get(n);
   const s = SETS[n], root = (dev() ? '' : 'public/') + 'tex/' + n + '/';
   const get = (m, srgb) => loader.loadAsync(root + m + '.ktx2').then(t => {
+    // a GPU-compressed scan whose size is not a multiple of 4 is rejected by most PC graphics cards
+    // (BC formats) and draws black: keep the painted texture instead
+    const im = t.image || {};
+    if (t.isCompressedTexture && ((im.width % 4) || (im.height % 4))) { t.dispose(); return null; }
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = GFX.aniso;
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     return t;

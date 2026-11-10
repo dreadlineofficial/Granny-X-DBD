@@ -1,0 +1,28 @@
+// lose the WebGL context mid-match, restore it, compare frames
+import { chromium } from 'playwright';
+import http from 'node:http'; import { readFile, writeFile } from 'node:fs/promises'; import { join, extname } from 'node:path';
+const ROOT = '/home/user/granny-x-dbd';
+const [quality = 'medium', pre = '/tmp/claude-0/shots/cl', page = 'index.html'] = process.argv.slice(2);
+const srv = http.createServer(async (q, r) => { let u = decodeURIComponent(q.url.split('?')[0]); if (u === '/') u = '/index.html'; try { const b = await readFile(join(ROOT, u)); r.writeHead(200, { 'content-type': { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css' }[extname(u)] || 'application/octet-stream' }); r.end(b); } catch { r.writeHead(404); r.end(); } }).listen(0);
+const br = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+const ctx = await br.newContext({ viewport: { width: 960, height: 540 } });
+await ctx.addInitScript(([quality]) => { localStorage.setItem('gdbd_profile', JSON.stringify({ seen: { intro: true, help: true, tut: true, granny: true }, killer: { char: 'granny', perks: [] }, survivor: { char: 'mara', perks: [] } })); localStorage.setItem('gdbd_settings', JSON.stringify({ quality, name: 'Tester' })); window.__nbNoRTC = true; window.__nbMqtt = ['ws://127.0.0.1:1']; }, [quality]);
+const pg = await ctx.newPage(); const logs = [];
+pg.on('pageerror', e => logs.push('ERR ' + e.message)); pg.on('console', m => { const t = m.text(); if (/context|Context|THREE/.test(t)) logs.push(m.type() + ' ' + t.slice(0, 200)); });
+await pg.goto(`http://localhost:${srv.address().port}/${page}`);
+await pg.waitForFunction(() => window.__nb && document.querySelector('#mainnav button') && document.getElementById('loading').classList.contains('hidden'), null, { timeout: 180000 });
+await pg.click('#mainnav button[data-act="play-survivor"]', { force: true }); await pg.waitForTimeout(500);
+await pg.selectOption('#bots-map', 'granny'); await pg.selectOption('#bots-killer', 'granny');
+await pg.click('#btn-bots-start');
+await pg.waitForFunction(() => window.__nb.session && window.__nb.session.game && document.getElementById('loading').classList.contains('hidden'), null, { timeout: 400000 });
+await pg.waitForTimeout(3000);
+const shot = async n => { const d = await pg.evaluate(() => { const g = window.__nb.session.game; g.frame(1 / 60); const c = g.renderer.domElement; return c.toDataURL('image/jpeg', 0.8); }); await writeFile(`${pre}-${n}.jpg`, Buffer.from(d.split(',')[1], 'base64')); };
+const lum = () => pg.evaluate(() => { const g = window.__nb.session.game; g.frame(1 / 60); const c = g.renderer.domElement, k = document.createElement('canvas'); k.width = 96; k.height = 54; const x = k.getContext('2d'); x.drawImage(c, 0, 0, 96, 54); const d = x.getImageData(0, 0, 96, 54).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return +(s / (d.length / 4) / 3).toFixed(1); });
+console.log('before', await lum()); await shot('before');
+await pg.evaluate(() => { const gl = window.__nb.session.game.renderer.getContext(); window.__lc = gl.getExtension('WEBGL_lose_context'); window.__lc.loseContext(); });
+await pg.waitForTimeout(1500);
+await pg.evaluate(() => window.__lc.restoreContext());
+await pg.waitForTimeout(6000);
+console.log('after', await lum()); await shot('after');
+console.log(logs.slice(0, 30).join('\n'));
+await br.close(); srv.close();

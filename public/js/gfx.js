@@ -15,6 +15,18 @@ export function setStyle(style, renderer) {
 
 // a dim night sky as an environment map: faint reflections on metal, glass, wet blood and eyes
 const envCache = new WeakMap();
+// after the graphics context was lost and restored, the night-sky reflection maps are empty (they are drawn
+// by the game, not loaded): everything lit by them went much darker. Draw them again and put them back.
+export function refreshEnvs(renderer, scenes) {
+  const per = envCache.get(renderer); if (!per) return;
+  const old = new Map(); for (const [k, v] of per) old.set(v, k);
+  envCache.delete(renderer);
+  for (const sc of scenes) {
+    if (!sc || !sc.environment || !old.has(sc.environment)) continue;
+    const [top, hor] = old.get(sc.environment).split(':').map(Number);
+    try { sc.environment = nightEnv(renderer, top, hor); } catch (e) { console.warn('env refresh', e); }
+  }
+}
 export function nightEnv(renderer, top = 0x1a2436, horizon = 0x0c1018, moonDir = new THREE.Vector3(30, 60, 20)) {
   let per = envCache.get(renderer);
   if (!per) envCache.set(renderer, per = new Map());

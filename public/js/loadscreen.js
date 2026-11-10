@@ -157,10 +157,12 @@ function frame(now) {
   const r = getR();
   if (r) {
     cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix();
-    const exp = r.toneMappingExposure, ac = r.autoClear;
-    r.setRenderTarget(null); r.autoClear = true; r.toneMappingExposure = 1.55;
+    // its own shadow setting: the menu and the match switch shadows on and off, and every switch made all
+    // of this scene's shaders compile again (a long stall at the start of each loading screen)
+    const exp = r.toneMappingExposure, ac = r.autoClear, sh = r.shadowMap.enabled;
+    r.setRenderTarget(null); r.autoClear = true; r.toneMappingExposure = 1.55; r.shadowMap.enabled = !lite;
     try { r.render(L.sc, cam); } catch (e) { console.warn(e); }
-    r.toneMappingExposure = exp; r.autoClear = ac;
+    r.toneMappingExposure = exp; r.autoClear = ac; r.shadowMap.enabled = sh;
     if (!L.drawn) { L.drawn = true; $('ls-3d').classList.add('drawn'); }
   }
   L.raf = requestAnimationFrame(frame);
@@ -177,6 +179,8 @@ export function showLoading(on, msg, isLite, rendererOf) {
   if (on === want) return;
   want = on;
   el.classList.toggle('hidden', !on);
+  // the loading screen is see-through over the 3D canvas it draws on: hide the menu / HUD in between
+  document.documentElement.classList.toggle('ls-up', on);
   if (!on) { clearInterval(tipT); return; }
   tip(); clearInterval(tipT); tipT = setInterval(tip, 6000);
   lite = !!isLite;

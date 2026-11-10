@@ -1,0 +1,35 @@
+// diag: start a bot match and report console warnings, the longest frame stall after loading ends, texture state
+import { chromium } from 'playwright';
+import http from 'node:http'; import { readFile } from 'node:fs/promises'; import { join, extname } from 'node:path';
+const ROOT = '/home/user/granny-x-dbd';
+const [killer = 'granny', map = 'granny', quality = 'medium', role = 'survivor'] = process.argv.slice(2);
+const srv = http.createServer(async (q, r) => { let u = decodeURIComponent(q.url.split('?')[0]); if (u === '/') u = '/index.html'; try { const b = await readFile(join(ROOT, u)); r.writeHead(200, { 'content-type': { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css' }[extname(u)] || 'application/octet-stream' }); r.end(b); } catch { r.writeHead(404); r.end(); } }).listen(0);
+const br = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+const ctx = await br.newContext({ viewport: { width: 1280, height: 720 } });
+await ctx.addInitScript(([quality, killer]) => { localStorage.setItem('gdbd_profile', JSON.stringify({ seen: { intro: true, help: true, tut: true, granny: true }, killer: { char: killer, perks: [] }, survivor: { char: 'mara', perks: [] } })); localStorage.setItem('gdbd_settings', JSON.stringify({ quality, name: 'Tester' })); window.__nbNoRTC = true; window.__nbMqtt = ['ws://127.0.0.1:1'];
+  window.__gaps = []; let last = 0; const f = t => { if (last) window.__gaps.push([Math.round(t), Math.round(t - last)]); last = t; requestAnimationFrame(f); }; requestAnimationFrame(f); }, [quality, killer]);
+const pg = await ctx.newPage(); const errs = [], warns = {};
+pg.on('pageerror', e => errs.push(e.message)); pg.on('console', m => { if (m.type() === 'warning' || m.type() === 'error') { const k = m.text().slice(0, 160); warns[k] = (warns[k] || 0) + 1; } });
+await pg.goto(`http://localhost:${srv.address().port}/index.html`);
+await pg.waitForFunction(() => window.__nb && document.querySelector('#mainnav button'), null, { timeout: 120000 });
+await pg.waitForFunction(() => document.getElementById('loading').classList.contains('hidden'), null, { timeout: 120000 });
+console.log('menu up at', await pg.evaluate(() => Math.round(performance.now())));
+await pg.waitForTimeout(1500);
+await pg.click(`#mainnav button[data-act="play-${role}"]`, { force: true }); await pg.waitForTimeout(500);
+await pg.selectOption('#bots-map', map); if (role === 'survivor') await pg.selectOption('#bots-killer', killer);
+const tClick = await pg.evaluate(() => Math.round(performance.now()));
+await pg.click('#btn-bots-start');
+await pg.waitForFunction(() => window.__nb.session && window.__nb.session.game && document.getElementById('loading').classList.contains('hidden'), null, { timeout: 240000 });
+const tUp = await pg.evaluate(() => Math.round(performance.now()));
+await pg.waitForTimeout(8000);
+const r = await pg.evaluate(([tClick, tUp]) => {
+  const g = window.__nb.session.game, R = g.renderer, gl = R.getContext();
+  const gaps = window.__gaps.filter(([t]) => t > tUp).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const load = window.__gaps.filter(([t]) => t > tClick && t <= tUp + 50).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  let maps = 0, noimg = 0, mats = new Set(); const units = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+  g.scene.traverse(o => { if (!o.material) return; for (const m of [].concat(o.material)) { mats.add(m); for (const k of ['map', 'normalMap', 'roughnessMap', 'emissiveMap', 'aoMap', 'metalnessMap']) { const t = m[k]; if (!t) continue; maps++; const im = t.image; if (!im || !(im.width || im.videoWidth)) noimg++; } } });
+  let lights = 0, shadowLights = 0; g.scene.traverse(o => { if (o.isLight && !o.isAmbientLight && !o.isHemisphereLight) { lights++; if (o.castShadow) shadowLights++; } });
+  return { par: R.extensions.has('KHR_parallel_shader_compile'), units, maps, noimg, mats: mats.size, lights, shadowLights, programs: R.info.programs.length, textures: R.info.memory.textures, gaps, load, loadMs: tUp - tClick, lost: gl.isContextLost() };
+}, [tClick, tUp]);
+console.log(JSON.stringify(r)); console.log('warnings', JSON.stringify(warns, null, 1)); console.log('errors', errs);
+await br.close(); srv.close();

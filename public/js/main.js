@@ -6,7 +6,7 @@ import { Bots } from './bots.js';
 import { Game } from './game.js';
 import { QUALITY } from './world.js';
 import { setDetail } from './models.js';
-import { setStyle, realistic, nightEnv } from './gfx.js';
+import { setStyle, realistic, nightEnv, refreshEnvs } from './gfx.js';
 import { initPhoto } from './pbr.js';
 import { MenuScene } from './menu.js';
 import { loadForeman, onForemanReady, loadBatman } from './foremanGlb.js';
@@ -137,9 +137,28 @@ function makeRenderer() {
   renderer.setPixelRatio(Math.min(1.5, q.pixel));
   renderer.setSize(innerWidth, innerHeight);
   $('game').appendChild(renderer.domElement);
+  watchContext(renderer.domElement);
   setStyle(settings.style, renderer);
   initPhoto(renderer, settings.quality);
   setDetail(settings.quality);
+}
+// The graphics driver can drop the WebGL context (a GPU reset after a long freeze, low memory on phones,
+// the app sent to the background). three.js uploads models and textures again when it comes back; the
+// reflection maps the game draws itself are rebuilt here. If it never comes back the screen would stay
+// black, so the game reloads.
+let ctxLostAt = 0, ctxT = 0;
+function watchContext(canvas) {
+  canvas.addEventListener('webglcontextlost', () => {
+    ctxLostAt = Date.now(); console.warn('graphics context lost');
+    clearTimeout(ctxT);
+    ctxT = setTimeout(() => { if (ctxLostAt && renderer && renderer.domElement === canvas) { toast('The graphics driver reset. Reloading the game…', 5000); setTimeout(() => location.reload(), 1800); } }, 12000);
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    console.warn('graphics context restored after', Date.now() - ctxLostAt, 'ms');
+    ctxLostAt = 0; clearTimeout(ctxT);
+    if (!renderer || renderer.domElement !== canvas) return;
+    refreshEnvs(renderer, [menu && menu.scene, session && session.game && session.game.scene]);
+  });
 }
 makeRenderer();
 
@@ -150,6 +169,7 @@ function toast(msg, ms = 3500) {
 function loading(on, text) { showLoading(on, text, settings.quality === 'potato' || settings.quality === 'low', () => renderer); }
 window.__showLoading = loading; // (trailer / test capture)
 const nextFrame = () => new Promise(r => setTimeout(r, 40));
+const warmMsg = msg => loading(true, msg);
 
 // ---------- 3D menu scene ----------
 let menu = null;
@@ -226,8 +246,11 @@ function openPanel(id, title, wide = false) {
   if (id === 'p-pass') renderPass();
   if (id === 'p-friends') renderFriends();
 }
-function closePanel() {
-  if (openSection === 'p-lobby' && lobby) { leaveOnline(); return; }
+function closePanel(byPlayer) {
+  // closing the lobby panel leaves the room, but only when the player closes it: the weekly awards popping
+  // up (or anything else that tidies the panels away) used to throw people out of the lobby they had just
+  // joined, e.g. through an invite link while the game was still starting
+  if (openSection === 'p-lobby' && lobby) { if (byPlayer) leaveOnline(); return; }
   $('panel').classList.add('hidden');
   $('menu').classList.remove('panel-open');
   if (openSection === 'p-loadout' && menu) { menu.setMode(menuMode); menu.showFor = null; }
@@ -242,8 +265,8 @@ function show(id) { // compatibility helper used by the online code
   else if (id === 'p-lobby') openPanel('p-lobby', 'Lobby', true);
   else if (id === 'p-join') openPanel('p-online', 'Online Match');
 }
-$('panel-close').addEventListener('click', () => { sound.play('click'); closePanel(); });
-addEventListener('keydown', e => { if (e.key === 'Escape' && !session && openSection) closePanel(); });
+$('panel-close').addEventListener('click', () => { sound.play('click'); closePanel(true); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && !session && openSection && $('announce').classList.contains('hidden')) closePanel(true); });
 
 const navActions = {
   'play-survivor': () => { botsCfg.role = 'survivor'; setSeg('bots-role', 'survivor'); setScene('survivor'); openPanel('p-play', 'Play as Survivor'); },
@@ -866,6 +889,9 @@ class HostSession {
     this.game = new Game({ renderer, M: this.M, myId: this.myId, isHost: true, session: this, settings, onEnd: (S, me) => onMatchEnd(S, me, this) });
     await nextFrame();
     this.game.start();
+    // textures + shaders before the loading screen goes (the first frame used to freeze for seconds)
+    await this.game.warmUp(nextFrame, warmMsg);
+    this.lastSim = performance.now(); // the warm-up is not match time
   }
   state() { return this.sim.S; }
   send(m) {
@@ -987,9 +1013,13 @@ class ClientSession {
       if (!this.S.players.some(p => p.id === this.myId)) return;
       this.game = new Game({ renderer, M: this.M, myId: this.myId, isHost: false, session: this, settings, onEnd: (S, me) => onMatchEnd(S, me, this) });
       this.game.start();
-      loading(false);
       this.queued = [];
+      // textures + shaders while the loading screen is still up, then the match
+      this.warming = true;
+      this.game.warmUp(nextFrame, warmMsg).catch(e => console.warn(e)).finally(() => { this.warming = false; if (session === this) loading(false); });
+      return;
     }
+    if (this.warming) return;
     this.game.frame(dt);
   }
   dispose() { this.game && this.game.dispose(); }

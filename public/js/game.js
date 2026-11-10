@@ -2594,6 +2594,44 @@ export class Game {
     if (this.post) { const pr = this.renderer.getPixelRatio(); this.post.uniforms.px.value.set(1 / (innerWidth * pr), 1 / (innerHeight * pr)); }
   }
 
+  // Runs while the loading screen is still up, before the first real frame. Without it the first frame of a
+  // match had to create every character, upload ~120 textures and compile ~85 shaders at once, so the
+  // loading screen froze for seconds right before the match appeared ("freezes before the match").
+  // Where the graphics driver can compile shaders in the background (KHR_parallel_shader_compile: Chrome /
+  // Electron on Windows, most Android WebViews) that happens while the loading screen keeps moving;
+  // elsewhere the one heavy frame is drawn behind the loading screen instead of in the match.
+  async warmUp(wait, say) {
+    const r = this.renderer, sc = this.scene, cam = this.camera;
+    if (!r || !sc || !cam || this.disposed) return;
+    if (say) say('Lighting the house…');
+    await wait();
+    // 1) one frame with drawing switched off: characters, props and effects are created
+    const comp = this.composer, render = r.render;
+    this.composer = null; r.render = () => {};
+    try { this.frame(1 / 60); } catch (e) { console.warn('warm-up frame', e); } finally { this.composer = comp; r.render = render; }
+    await wait(); if (this.disposed) return;
+    // 2) textures to the graphics card, a slice per frame
+    const texs = new Set(), addT = v => { if (v && v.isTexture && !v.isRenderTargetTexture && v.image) texs.add(v); };
+    sc.traverse(o => { for (const m of [].concat(o.material || [])) { for (const k in m) addT(m[k]); if (m.uniforms) for (const k in m.uniforms) addT(m.uniforms[k] && m.uniforms[k].value); } });
+    let s = performance.now();
+    for (const t of texs) {
+      try { r.initTexture(t); } catch (e) { /* uploaded on first use as usual */ }
+      if (performance.now() - s > 24) { await wait(); if (this.disposed) return; s = performance.now(); }
+    }
+    // 3) shaders in the background, for the same target the match draws into (post-processing: a render target)
+    if (r.extensions.has('KHR_parallel_shader_compile')) {
+      const rt = this.composer ? new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType }) : null;
+      let p = null;
+      try { r.setRenderTarget(rt); p = r.compileAsync(sc, cam); } catch (e) { console.warn('warm-up compile', e); } finally { r.setRenderTarget(null); }
+      if (p) await Promise.race([p.catch(() => {}), new Promise(res => setTimeout(res, 30000))]);
+      if (rt) rt.dispose();
+      if (this.disposed) return;
+    }
+    // 4) one real frame behind the loading screen: shadows, post-processing and anything left over
+    try { this.frame(1 / 60); } catch (e) { console.warn('warm-up frame', e); }
+    await wait();
+  }
+
   dispose() {
     this.disposed = true;
     this.unbind();
