@@ -85,7 +85,11 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
 - Angeline (`angeline`, third person, 1.3): Yellow Eyes (RMB hold: a 16 m beam from her eyes; 0.5 s in it = `spotted`,
   her next hit downs; `spotT`/`inBeam`), Lullaby (R: survivors within 30 m get `drowsy` 5 s: no running, x0.75 speed).
   Model angeline.glb (CC BY 4.0, "Angeline Unity" by A_Forogotten_Studio; SPEC yaw PI). Her camera sits wider and she fades
-  when a wall pulls the camera close.
+  when a wall pulls the camera close. **She is animated in code, not with the file's clips** (they twisted her and stretched
+  her arm; the rest pose stood her sleeves up like wings). The file's bind matrices are ~1.8x taller than the mesh:
+  `toBindPose` fits that stretch from the mesh's joints, corrects the inverse bind matrices and puts her in the T-pose;
+  `animateAngeline` aims bones in parent space (`aimBone`/`turnBone`) from that rest each frame (hanging arms, glide lean,
+  float bob, spread arms for Yellow Eyes, wind-up + two-handed lunge, stun flail). Her size is measured in that pose.
 - Granny's House floors (1.3): `grannyfloors.js` = per-floor support maps measured from granny_map.glb; nav cells with no
   floor under them are blocked, and `dropFloor` drops anyone who walks off an edge to the floor below. Gen/teammate
   auras are hidden across floors. Bear traps use granny_bear_trap.glb (jaws close on `bearsnap`).
