@@ -111,23 +111,33 @@ node tools/build.mjs            # → GrannyDBD.html + index.html
 Play/test: `python3 -m http.server 8091` in the project root, open `http://localhost:8091/index.html`.
 
 ### Windows .exe (Electron)
-```bash
-cp GrannyDBD.html tools/electron/app/index.html
-cd tools/electron && npm install
-npx @electron/packager . GrannyxDBD --platform=win32 --arch=x64 --out=out --overwrite --icon=icon.ico
-(cd out && zip -qr ../GrannyxDBD-Windows.zip GrannyxDBD-win32-x64)   # backup: the folder, must be extracted
-npx electron-builder --win portable --x64 --prepackaged out/GrannyxDBD-win32-x64 --config builder.json  # → dist/GrannyxDBD.exe
-```
 The single portable `dist/GrannyxDBD.exe` (with `splash.bmp`) is what the owner uploads: people ran the old .exe
-from inside the zip. Without Wine, `--icon` can't be applied by the packager: set icon + version on the packaged exe
-before the electron-builder step: `node tools/electron/seticon.mjs out/GrannyxDBD-win32-x64/GrannyxDBD.exe icon.ico 1.3.1`
-(resedit + pe-library). The NSIS installer target needs Wine. In practice: package with `--ignore='^/out' --ignore='^/dist'`
-(no `--icon`), run seticon, then electron-builder. The owner can't download a bare .exe from the chat: send it zipped
-(`zip -9 GrannyxDBD-<ver>-Windows.zip GrannyxDBD.exe`).
+from inside the zip. `dist/GrannyxDBD-Setup.exe` (one-click installer: %LOCALAPPDATA%\Programs\grannyxdbd, desktop + Start
+menu shortcut) is the sturdier option. Exact commands (cloud session, no `--icon` on the packager):
+```bash
+cp GrannyDBD.html tools/electron/app/index.html && cd tools/electron && npm install
+npx @electron/packager . GrannyxDBD --platform=win32 --arch=x64 --out=out --overwrite --app-version=1.3.0 \
+  --ignore='^/out' --ignore='^/dist' --ignore='^/node_modules' --ignore='^/seticon\.mjs' --ignore='^/builder\.json' \
+  --ignore='^/splash\.bmp' --ignore='^/icon\.ico' --ignore='^/package-lock\.json'
+node seticon.mjs out/GrannyxDBD-win32-x64/GrannyxDBD.exe icon.ico 1.3.0     # icon + version (resedit + pe-library)
+npx electron-builder --win portable --x64 --prepackaged out/GrannyxDBD-win32-x64 --config builder.json  # dist/GrannyxDBD.exe
+npx electron-builder --win nsis --x64 --prepackaged out/GrannyxDBD-win32-x64 --config builder.json      # dist/GrannyxDBD-Setup.exe
+```
+**`builder.json` must keep `"executableName": "GrannyxDBD"`** (= the packager's exe name). Without it the portable launcher and
+the installer look for `Granny x DBD.exe` (from productName), fail to start it and quit with code 1: that was the
+"EXE doesn't launch" bug fixed in the 1.3.0 rebuild (Nov 2026). The NSIS installer target needs 32-bit Wine
+(`dpkg --add-architecture i386 && apt-get install wine32:i386`, slow download); with it the exe can also be tested here:
+`WINEPREFIX=... DISPLAY=:77 wine dist/GrannyxDBD.exe --no-sandbox` under Xvfb (Wine's GPU process crashes, so the app goes
+to Safe Graphics and then runs; that exercises the restart path too). Send exes zipped
+(`zip -9 GrannyxDBD-<ver>-Windows.zip GrannyxDBD.exe`): the owner can't download a bare .exe from the chat.
 
-`main.js` opens `app/index.html`, maximised, no menu bar, F11/Alt+Enter fullscreen, single instance, logs to
-`%APPDATA%\Granny x DBD\log.txt`; repeated GPU/page crashes relaunch it in Safe Graphics mode (software WebGL,
-sticky; `--gpu` resets it). External links go to the real browser.
+`main.js` shows a splash window (`splash/splash.html` + `art.jpg`, 720x320, status line + running red bar) straight away and
+keeps it up until the game window's ready-to-show (fallback 45 s), so there is no blank gap after the portable launcher's
+`splash.bmp` (same art, "Unpacking the house…"; regenerate both from one HTML render if the art changes). Then: maximised,
+no menu bar, F11/Alt+Enter fullscreen, single instance, logs to `%APPDATA%\Granny x DBD\log.txt` (first line per start:
+version, Windows build, portable/unpacked, gpu/safe); repeated GPU/page crashes relaunch it in Safe Graphics mode
+(software WebGL, sticky; `--gpu` resets it). In the portable exe the relaunch goes through `PORTABLE_EXECUTABLE_FILE`
+(the launcher deletes its unpacked copy when the first process exits). External links go to the real browser.
 
 ### Android .apk
 Uses an Android SDK at `SDK=/home/user/android-sdk` (build-tools 34, platform 34) if present; otherwise Ubuntu's packaged
@@ -160,8 +170,10 @@ graphics (anisotropy, PCF soft shadows on medium, unsharp mask in PostShader), p
 Discord link, mobile-only controls + APK 1.3.0 (versionCode 13). The 1.3.0 APK was signed with a NEW key (the owner's
 release.jks wasn't available), so players uninstall older APKs first; re-sign with release.jks for later updates.
 Devlog banner "ANGELINE · SLENDRINA'S MOTHER IS HERE" rendered in-engine.
-1.3.1 (current): Angeline animated in code (see Angeline above); APK versionCode 14 / 1.3.1, Windows app 1.3.1
-(config.js `VERSION` still says '1.3.0', NET_PROTOCOL 12: 1.3.0 and 1.3.1 play together). Main branch = latest.
+1.3.1 build: Angeline animated in code (see Angeline above); APK versionCode 14.
+The owner calls the current version **1.3.0**: keep `VERSION` '1.3.0' and label builds 1.3.0 unless told otherwise.
+Nov 2026 rebuild (1.3.0): Windows exe launch fix (`executableName`), new startup splash (NSIS splash.bmp + in-app splash
+window), installer build, APK versionCode 15 / versionName 1.3.0 signed with grannyxdbd-1.3.jks (installs over 1.3.x).
 
 ## Where things stand / next steps
 - The 1.3.x APKs are signed with a key made in the 1.3 session (`grannyxdbd-1.3.jks`, alias `grannyxdbd`), which was handed
@@ -170,7 +182,9 @@ Devlog banner "ANGELINE · SLENDRINA'S MOTHER IS HERE" rendered in-engine.
   in chat; if the owner doesn't have the key, a new key means players uninstall first.
 - Not yet tested on a real phone (only Chromium phone emulation) and the public lobby list was tested against a local relay,
   not the public brokers.
-- Ideas not done: a 1.3 YouTube Short / trailer with Angeline; bump `VERSION` to 1.3.1 next time anything ships.
+- Ideas not done: a 1.3 YouTube Short / trailer with Angeline. The exe/installer are unsigned: SmartScreen shows
+  "Windows protected your PC" (More info -> Run anyway) until they're code-signed.
+- The Windows exe was tested under Wine only, not on a real Windows PC.
 1.2: Granny's Old House enterable, stronger shotgun, taller Slendrina (1.95m), smarter bots, YouTube Short #2
 ("SHE'S NOT ALONE ANYMORE.", rendered in-engine, synthesized score).
 1.1: Grandpa as his own killer, Slendrina, Granny's Old House, bot stall fixes, portable Windows exe,
