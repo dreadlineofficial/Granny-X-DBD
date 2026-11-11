@@ -3,6 +3,7 @@
 // grime and blood, a wet quarry-tile floor, stained ceiling, pipes along every wall, steel door frames
 // and plastic strip curtains, meat rails with split carcasses on gambrels, enamel signs, drains,
 // tubs of offal, hanging lamps with light shafts, fluorescent tubes in the halls and dust in the air.
+import { PERF } from './gfx.js';
 import * as THREE from 'three';
 import { HALF } from './config.js';
 import { rng } from './map.js';
@@ -73,7 +74,7 @@ function shaftMaterial(color) {
 export function buildMeatWorld(M, quality = 'medium') {
   const q = QUALITY[quality] || QUALITY.medium;
   setDetail(quality);
-  const lite = quality === 'potato' || quality === 'low', high = quality === 'high';
+  const lite = quality === 'potato' || quality === 'low' || PERF.on, high = quality === 'high';
   const R = rng(M.seed * 11 + 1);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(FOG);

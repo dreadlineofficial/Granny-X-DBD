@@ -19,6 +19,7 @@ tools/android/*.jks
 # finished builds handed to the owner (exe zips, apk): never committed
 deliver/
 deliver133/
+/deliver133b/
 
 # Sketchfab Standard licence: used in builds, not redistributed on its own (the owner keeps the file)
 public/models/freddy.glb

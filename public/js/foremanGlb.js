@@ -2,6 +2,7 @@
 // (single-file build) or models/foreman.glb (server), then cloned per use. The skeleton is
 // driven by its own clips (Idle, Walk, Stalk, Run, Attack, Grab, Stunned) through a mixer.
 import * as THREE from 'three';
+import { b64buf, heavy } from './heavy.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
@@ -31,7 +32,7 @@ async function bytes() {
 export function loadForeman() {
   if (loading) return loading;
   loading = bytes()
-    .then(buf => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)))
+    .then(buf => heavy(() => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej))))
     .then(g => { gltf = g; for (const cb of waiters.splice(0)) { try { cb(); } catch (e) { console.error(e); } } return g; })
     .catch(e => { console.warn('Foreman model unavailable, using the built-in one:', e); });
   return loading;
@@ -153,7 +154,7 @@ export function loadBatman() {
     if (el && el.textContent.trim()) { const s2 = atob(el.textContent.trim()), b = new Uint8Array(s2.length); for (let i = 0; i < s2.length; i++) b[i] = s2.charCodeAt(i); buf = b.buffer; }
     else { const dev = !!document.querySelector('script[type=importmap]'); for (const url of dev ? ['models/batman.glb', 'public/models/batman.glb'] : ['public/models/batman.glb', 'models/batman.glb']) { try { const r = await fetch(url); if (r.ok) { buf = await r.arrayBuffer(); break; } } catch (_) {} } }
     if (!buf) throw new Error('batman.glb unavailable');
-    batman = await new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej));
+    batman = await heavy(() => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)));
     return batman;
   })().catch(e => { console.warn('Batman skin unavailable:', e); return null; });
   return batLoading;

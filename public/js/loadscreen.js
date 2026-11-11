@@ -8,6 +8,7 @@ import { loadGranny, loadGrandpa, loadSlendrina, loadAngeline, loadSpiderMom, gr
 import { loadScene, cloneScene, sceneReady } from './sceneGlb.js';
 import { makeKiller, animate } from './models.js';
 import { KILLERS } from './config.js';
+import { PERF } from './gfx.js';
 
 const $ = id => document.getElementById(id);
 const TIPS = [
@@ -101,16 +102,28 @@ function build() {
 }
 
 // the set needs the house; each killer joins the reel once their model has loaded
+// 1.3.3: a new piece (the house, a killer) has its shaders compiled in the background before it's shown, so the
+// reel doesn't freeze the moment it appears (where the device can compile in the background; otherwise as before)
+function warm(done) {
+  const r = getR();
+  if (!r || !r.extensions || !r.extensions.has('KHR_parallel_shader_compile')) { done(); return; }
+  const sh = r.shadowMap.enabled; let p = null;
+  try { r.shadowMap.enabled = !lite; r.setRenderTarget(null); p = r.compileAsync(L.sc, L.cam); } catch (e) { p = null; } finally { r.shadowMap.enabled = sh; }
+  if (!p) { done(); return; }
+  Promise.race([p.catch(() => {}), new Promise(res => setTimeout(res, 8000))]).then(done);
+}
 function dress() {
   if (!L.set && sceneReady('granny_map')) {
     L.set = true;
-    const house = cloneScene('granny_map', lite); if (house) L.sc.add(house);
-    $('ls-3d').classList.add('in'); shownAt = Date.now();
+    const house = cloneScene('granny_map', lite);
+    if (house) { house.visible = false; L.sc.add(house); warm(() => { house.visible = true; $('ls-3d').classList.add('in'); shownAt = Date.now(); }); }
+    else { $('ls-3d').classList.add('in'); shownAt = Date.now(); }
   }
   for (const k of REEL) if (!L.rigs[k.id] && k.ready()) {
     const R = makeKiller(k.id, {}); if (!R) continue;
     R.root.visible = false; R.root.traverse(o => { if (o.isMesh) o.castShadow = !lite; });
-    L.sc.add(R.root); L.rigs[k.id] = R;
+    L.sc.add(R.root); L.rigs[k.id] = R; R.lsReady = false;
+    warm(() => { R.lsReady = true; });
   }
 }
 function card(k) {
@@ -126,7 +139,7 @@ function frame(now) {
   dress();
   const t = L.t, cam = L.cam;
   // whose turn (only killers already loaded)
-  const ready = REEL.filter(k => L.rigs[k.id]);
+  const ready = REEL.filter(k => L.rigs[k.id] && L.rigs[k.id].lsReady);
   const slot = Math.floor(t / SHOT), k = ready.length ? ready[slot % ready.length] : null, u = (t % SHOT) / SHOT;
   if (k && (L.cur !== slot || L.curId !== k.id)) { L.cur = slot; L.curId = k.id; card(k); }
   // the card follows the reel's own clock (slides in as they arrive, fades as the lights go)
@@ -184,6 +197,9 @@ export function showLoading(on, msg, isLite, rendererOf) {
   if (!on) { clearInterval(tipT); return; }
   tip(); clearInterval(tipT); tipT = setInterval(tip, 6000);
   lite = !!isLite;
+  // optimization mode: a still picture instead of the 3D reel (no GPU work at all while things load)
+  el.classList.toggle('static', PERF.on);
+  if (PERF.on) { if (!shownAt) shownAt = Date.now() - 3500; return; }
   try { if (!L) { L = build(); loadScene('granny_map'); loadGranny(); loadGrandpa(); loadSlendrina(); loadAngeline(); loadSpiderMom(); } } catch (e) { console.warn('loading scene unavailable', e); return; }
   L.last = performance.now();
   if (!L.raf) L.raf = requestAnimationFrame(frame);

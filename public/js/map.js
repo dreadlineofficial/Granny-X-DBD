@@ -37,7 +37,7 @@ export function makeCtx(M, R, cx, cz, rot) {
   const odd = rot % 2 === 1;
   const rax = a => (odd ? (a === 'x' ? 'z' : 'x') : a);
   const C = {
-    rp,
+    rp, R,
     box(x, z, hx, hz, h, kind = 'crate', style = 'wood') {
       const [wx, wz] = rp(x, z);
       const b = { x: wx, z: wz, hx: odd ? hz : hx, hz: odd ? hx : hz, h, kind, style };
@@ -95,7 +95,7 @@ export function makeCtx(M, R, cx, cz, rot) {
 
 
 export function buildMap(seed, map) {
-  const M = map === 'granny1' ? buildArena(seed, 'granny1') : buildGrannyHouse(seed);
+  const M = map === 'granny1' || THEMES[map] ? buildArena(seed, map) : buildGrannyHouse(seed);
   addChests(M, seed);
   return M;
 }

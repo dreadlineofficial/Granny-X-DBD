@@ -65,7 +65,7 @@
           <div class="field"><label>Bot difficulty</label>
             <div class="seg" id="bots-diff"><button data-v="easy">Easy</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Hard</button></div></div>
           <div class="field"><label>Map</label>
-            <select id="bots-map"><option value="granny">Granny's House</option><option value="granny1">Granny's Old House</option><option value="random">Random</option></select></div>
+            <select id="bots-map"><option value="granny">Granny's House</option><option value="granny1">Granny's Old House</option><option value="grave">Slendrina's Graveyard</option><option value="random">Random</option></select></div>
           <div class="loadout-mini" id="bots-loadout"></div>
           <div class="actions"><button class="btn primary big" id="btn-bots-start">Ready</button></div>
         </section>
@@ -123,7 +123,7 @@
                 <div class="field"><label>Visibility</label><div class="seg" id="lobby-vis"><button data-v="public">Public</button><button data-v="private">Private</button></div></div>
                 <div class="field"><label>Game mode</label><select id="lobby-gm"></select></div>
                 <label class="check"><input type="checkbox" id="lobby-fill" checked> Fill empty slots with bots</label>
-                <div class="field"><label>Map</label><select id="lobby-map"><option value="granny">Granny's House</option><option value="granny1">Granny's Old House</option><option value="random">Random</option></select></div>
+                <div class="field"><label>Map</label><select id="lobby-map"><option value="granny">Granny's House</option><option value="granny1">Granny's Old House</option><option value="grave">Slendrina's Graveyard</option><option value="random">Random</option></select></div>
                 <div class="field"><label>Bot difficulty</label><div class="seg" id="lobby-diff"><button data-v="easy">Easy</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Hard</button></div></div>
               </div>
               <div class="chat"><div id="chat-log"></div><input id="chat-in" maxlength="120" placeholder="Say something… (Enter)"></div>
@@ -160,6 +160,7 @@
           <div class="field"><label>Visual style</label>
             <div class="seg" id="set-style"><button data-v="realistic">Realistic</button><button data-v="classic">Classic</button></div>
             <p class="hint" id="set-style-hint"></p></div>
+          <label class="check"><input type="checkbox" id="set-perf"> <b>Optimization mode</b>: runs smoother on slower PCs and phones (no shadows or effects, less grass, shorter view distance, lower resolution, a simple loading screen)</label>
           <label class="check"><input type="checkbox" id="set-dynres"> Dynamic resolution (keeps the frame rate smooth on slower devices)</label>
           <label class="check"><input type="checkbox" id="set-fps"> Show FPS counter</label>
           <div class="field mobile-only"><label>Touch controls</label><button class="btn" id="tc-edit">Edit touch controls</button><p class="hint">Move and resize the on-screen buttons.</p></div>

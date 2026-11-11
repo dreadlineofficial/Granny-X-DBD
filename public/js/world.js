@@ -1,7 +1,7 @@
 // Builds the 3D scene for a generated map.
 import * as THREE from 'three';
 import { HALF } from './config.js';
-import { realistic } from './gfx.js';
+import { realistic, PERF } from './gfx.js';
 import { cloneScene } from './sceneGlb.js';
 import { rng, barBox } from './map.js';
 import { tex } from './textures.js';
@@ -18,6 +18,16 @@ export const QUALITY = {
   high: { shadow: 2048, grass: 10000, pixel: Math.min(2, window.devicePixelRatio || 1), bloom: true, post: true, outer: 440, fog: 36, density: 0.03, far: 600, minPixel: 0.7 },
 };
 
+// 1.3.3 optimization mode: every preset loses its shadows, post-processing, most of the grass and some draw distance,
+// and renders at most at 75% resolution (the originals are kept so it can be switched back)
+const QBASE = JSON.parse(JSON.stringify(QUALITY));
+export function applyPerf(on) {
+  PERF.on = !!on;
+  for (const k in QUALITY) {
+    Object.assign(QUALITY[k], QBASE[k]);
+    if (on) Object.assign(QUALITY[k], { shadow: 0, post: false, bloom: false, grass: Math.round(QBASE[k].grass * 0.25), pixel: Math.min(QBASE[k].pixel, 0.75), minPixel: Math.min(QBASE[k].minPixel, 0.45), outer: Math.round(QBASE[k].outer * 0.6), far: Math.round(QBASE[k].far * 0.65) });
+  }
+}
 
 // distance from point to segment
 function segDist(px, pz, ax, az, bx, bz) {
@@ -33,7 +43,7 @@ export function buildWorld(M, quality = 'medium') {
   const LK = LOOK[M.map] || LOOK.woods, FOG_COLOR = LK.fog;
   const q = QUALITY[quality] || QUALITY.medium;
   setDetail(quality);
-  const lite = quality === 'potato' || quality === 'low';
+  const lite = quality === 'potato' || quality === 'low' || PERF.on;
   const R = rng(M.seed * 7 + 3);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(FOG_COLOR);
@@ -163,7 +173,7 @@ export function buildWorld(M, quality = 'medium') {
   };
   const tileOf = st => st === 'stone' ? 1.15 : st === 'brick' ? 1.6 : 2;
   for (const b of M.boxes) {
-    if (b.kind === 'gen' || b.kind === 'switch' || b.kind === 'logpile' || b.kind === 'mesh') continue; // ('mesh': drawn by the map's own model)
+    if (b.kind === 'gen' || b.kind === 'switch' || b.kind === 'logpile' || b.kind === 'mesh' || b.kind === 'pit' || b.kind === 'mound' || b.style === 'iron') continue; // ('mesh': drawn by the map's own model)
     if (b.kind === 'log') {
       const along = b.hx > b.hz;
       const geo = new THREE.CylinderGeometry(0.45, 0.5, (along ? b.hx : b.hz) * 2, 10);
@@ -176,7 +186,7 @@ export function buildWorld(M, quality = 'medium') {
     addBox(key, b, 0, b.h, b.hx, b.hz, b.kind === 'boundary' ? 2.4 : tileOf(key));
     if (b.kind === 'boundary') { addBox('stone', { x: b.x, z: b.z }, b.h, b.h + 0.25, b.hx + 0.12, b.hz + 0.12); continue; }
     if (LK.snowcaps && (b.kind === 'wall' || b.kind === 'sill' || b.kind === 'logpile' || b.kind === 'stone' || b.kind === 'truck' || b.kind === 'crate')) addBox('snowcap', { x: b.x, z: b.z }, b.h, b.h + 0.12, b.hx + 0.06, b.hz + 0.06, 2);
-    if (b.kind === 'wall' && LK.ruins) {
+    if (b.kind === 'wall' && LK.ruins && !b.noRuin) {
       // ruined, uneven top edge
       const long = Math.max(b.hx, b.hz), ax = b.hx > b.hz;
       const n = Math.floor(long * 1.2);

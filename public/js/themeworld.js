@@ -1,6 +1,7 @@
 // Look and set dressing for the outdoor themes (woods, marsh, carnival, snow).
 // LOOK drives the shared outdoor builder in world.js (sky, fog, light, ground palette, trees, grass);
 // buildThemeExtras adds each theme's own scenery; updateThemeFx animates it.
+import { PERF } from './gfx.js';
 import * as THREE from 'three';
 import { HALF } from './config.js';
 import { tex } from './textures.js';
@@ -18,10 +19,14 @@ export const LOOK = {
   // Granny's Old House: misty pine woods round the Granny 1 house
   granny1: { fog: 0x181c20, density: 1.2, hemi: [0x5a6472, 0x2a2218, 1.65], amb: 0x2a3038, moon: [0xc4d0e6, 2.5], sky: [0x030407, 0x0c1118], moonDisc: 0xeef2ff, halo: 0x8a9ab8,
     ground: [0x34402a, 0x4a5434, 0x523f2c, 0x30261a, 0x403424, 0x262418], groundTex: 'ground2', ruins: true, trees: 'pine', bushes: 0.9, bush: 0x26301e, grass: 0.9, grassTint: 0x8a9462, lamp: 0xffa850, groundFog: 0x5e6874, groundFogK: 1.6 },
+  // Slendrina's Graveyard (1.3.3): cold blue-green mist, dead trees, ruined stone, will-o'-wisps
+  grave: { fog: 0x161c22, density: 1.3, hemi: [0x5a6a7c, 0x241e18, 1.7], amb: 0x28303a, moon: [0xc8d8f0, 2.6], sky: [0x030508, 0x0b121c], moonDisc: 0xf0f6ff, halo: 0x9ab4d8,
+    ground: [0x2e3626, 0x3e4630, 0x463a2a, 0x2a2218, 0x383024, 0x22241c], groundTex: 'ground2', ruins: true, trees: 'dead', bushes: 0.55, bush: 0x242c1e, grass: 0.75, grassTint: 0x7e8a62, lamp: 0xffb060, groundFog: 0x8a9cb0, groundFogK: 2.2, particles: 'wisps' },
   snow: { fog: 0x222c3a, density: 0.95, hemi: [0x8aa0c4, 0x2a3240, 1.45], amb: 0x2e3648, moon: [0xc8d8f4, 2.3], sky: [0x03060e, 0x0e1a30], moonDisc: 0xf4f8ff, halo: 0xa8c0e8,
     ground: [0xc8d2e0, 0xdde4f0, 0x9aa2ae, 0xb0bac8, 0xc0c8d4, 0x9aa4b4], groundTex: 'snow', ruins: false, snowcaps: true, trees: 'snowpine', bushes: 0.4, bush: 0xb8c4d0, grass: 0, grassTint: 0x8a8a70, lamp: 0xffc070, groundFog: 0xc8d8f0, groundFogK: 1.6, particles: 'snow' },
 };
 
+const M4Y = (x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'YXZ')), new THREE.Vector3(sx, sy, sz));
 const M4 = (x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
 const col = h => new THREE.Color(h);
 
@@ -87,12 +92,12 @@ function particles(scene, n, color, size, opacity, R, h0, h1) {
 }
 
 export function buildThemeExtras(W, M, quality, R) {
-  const scene = W.scene, lite = quality === 'potato' || quality === 'low', LK = W.look;
+  const scene = W.scene, lite = quality === 'potato' || quality === 'low' || PERF.on, LK = W.look;
   const groups = {};
   const add = (key, geo, m, color) => (groups[key] ||= []).push({ geo, matrix: m, color });
   const box = (key, x, y, z, w, h, d, ry = 0) => add(key, new THREE.BoxGeometry(w, h, d), M4(x, y, z, 0, ry, 0));
   const cyl = (key, x, y, z, r1, r2, h, n = 12, rx = 0, rz = 0) => add(key, new THREE.CylinderGeometry(r1, r2, h, n), M4(x, y, z, rx, 0, rz));
-  W.fx = { bulbs: [], snow: null, flies: null };
+  W.fx = { bulbs: [], snow: null, flies: null, flames: [] };
 
   // ---------- marsh: black water, reeds, decks ----------
   if (M.pools.length) {
@@ -155,6 +160,28 @@ export function buildThemeExtras(W, M, quality, R) {
       scene.add(g);
       g.updateMatrixWorld(true);
       for (let k = 0; k < 36; k++) { const a = k / 36 * 6.283, p = new THREE.Vector3(Math.cos(a) * Rw, H + Math.sin(a) * Rw, 0.75).applyMatrix4(g.matrixWorld); W.fx.bulbs.push([p.x, p.y, p.z, k]); }
+    } else if (v.type === 'roof') {
+      // gabled roof: ridge along the long side, two sloped slabs plus gable ends
+      const w = v.x1 - v.x0, d = v.z1 - v.z0, alongX = w >= d, span = alongX ? d : w, len = alongX ? w : d, rise = span * 0.38, sl = Math.hypot(span / 2, rise), ang = Math.atan2(rise, span / 2);
+      const cx = (v.x0 + v.x1) / 2, cz = (v.z0 + v.z1) / 2, key = v.kind === 'boards' ? 'shingle' : 'slate';
+      for (const sd of [-1, 1]) {
+        const o = span / 4 * sd, y = v.y + rise / 2;
+        if (alongX) add(key, new THREE.BoxGeometry(len + 0.3, 0.12, sl + 0.2), M4(cx, y, cz + o, sd * ang, 0, 0));
+        else add(key, new THREE.BoxGeometry(sl + 0.2, 0.12, len + 0.3), M4(cx + o, y, cz, 0, 0, -sd * ang));
+      }
+      const tri = new THREE.Shape([new THREE.Vector2(-span / 2, 0), new THREE.Vector2(span / 2, 0), new THREE.Vector2(0, rise)]);
+      for (const sd of [-1, 1]) { const g = new THREE.ShapeGeometry(tri); const e = alongX ? M4(cx + sd * (len / 2 - 0.25), v.y, cz, 0, Math.PI / 2, 0) : M4(cx, v.y, cz + sd * (len / 2 - 0.25)); add(v.kind === 'boards' ? 'gableW' : 'gableS', g, e); }
+    } else if (v.type === 'nave') {
+      // the church's broken roof: bare rafters, a few surviving slabs over the altar end
+      const w = v.x1 - v.x0, d = v.z1 - v.z0, alongX = w >= d, len = alongX ? w : d, span = alongX ? d : w;
+      for (let o = 0.8; o < len - 0.5; o += 1.9) {
+        if (R() < 0.25) continue;
+        const a = (alongX ? v.x0 : v.z0) + o, tilt = (R() - 0.5) * 0.12;
+        if (alongX) add('beam', new THREE.BoxGeometry(0.22, 0.26, span + 0.4), M4(a, 3.05, (v.z0 + v.z1) / 2, tilt, 0, 0));
+        else add('beam', new THREE.BoxGeometry(span + 0.4, 0.26, 0.22), M4((v.x0 + v.x1) / 2, 3.05, a, 0, 0, tilt));
+      }
+      if (alongX) add('beam', new THREE.BoxGeometry(len, 0.3, 0.3), M4((v.x0 + v.x1) / 2, 4.6, (v.z0 + v.z1) / 2));
+      else add('beam', new THREE.BoxGeometry(0.3, 0.3, len), M4((v.x0 + v.x1) / 2, 4.6, (v.z0 + v.z1) / 2));
     } else if (v.type === 'clown') {
       const f = new THREE.Mesh(new THREE.CircleGeometry(1.15, 28), new THREE.MeshLambertMaterial({ map: clownTexture(), emissive: 0x200808 }));
       const dx = v.face[0] - v.x, dz = v.face[1] - v.z, L = Math.hypot(dx, dz) || 1;
@@ -168,6 +195,25 @@ export function buildThemeExtras(W, M, quality, R) {
       case 'barrel': cyl('barrel', p.x, 0.5, p.z, 0.4, 0.42, 1.0, 14); cyl('hoop', p.x, 0.2, p.z, 0.43, 0.43, 0.06); cyl('hoop', p.x, 0.8, p.z, 0.43, 0.43, 0.06); break;
       case 'crate': box('crate', p.x, 0.55, p.z, 1.0, 1.1, 1.0, p.rot); break;
       case 'cart': box('cartbody', p.x, 0.6, p.z, 1.1, 0.8, 0.7, p.rot); box('glass', p.x, 1.25, p.z, 0.9, 0.55, 0.55, p.rot); box('stripe', p.x, 1.62, p.z, 1.2, 0.1, 0.8, p.rot); for (const sx of [-0.45, 0.45]) cyl('tyre', p.x + Math.cos(p.rot) * sx, 0.22, p.z - Math.sin(p.rot) * sx, 0.22, 0.22, 0.08, 12, Math.PI / 2, 0); break;
+      case 'headstone': {
+        const h = (p.h || 1) * 0.8, w = 0.62, tilt = (R() - 0.5) * 0.16, lean = (R() - 0.5) * 0.1, yaw = p.rot || 0;
+        add('grave', new THREE.BoxGeometry(w, h, 0.16), M4Y(p.x, h / 2, p.z, lean, yaw, tilt));
+        if (R() < 0.7) { const top = new THREE.CylinderGeometry(w / 2, w / 2, 0.16, 14, 1, false, 0, Math.PI); top.rotateX(Math.PI / 2); top.rotateZ(Math.PI / 2); add('grave', top, M4Y(p.x, h, p.z, lean, yaw, tilt)); }
+        add('dirt', new THREE.BoxGeometry(0.7, 0.08, 1.6), M4Y(p.x + Math.sin(yaw) * 0.85, 0.04, p.z + Math.cos(yaw) * 0.85, 0, yaw, 0));
+        break;
+      }
+      case 'cross': { const yaw = p.rot || 0, t = (R() - 0.5) * 0.12; add('grave', new THREE.BoxGeometry(0.14, 1.7, 0.14), M4Y(p.x, 0.85, p.z, t, yaw, 0)); add('grave', new THREE.BoxGeometry(0.72, 0.14, 0.14), M4Y(p.x, 1.22, p.z, t, yaw, 0)); break; }
+      case 'angel': {
+        const yaw = p.rot || 0;
+        add('marble', new THREE.BoxGeometry(0.9, 0.9, 0.9), M4Y(p.x, 0.45, p.z, 0, yaw, 0));
+        add('marble', new THREE.CylinderGeometry(0.16, 0.36, 1.25, 10), M4Y(p.x, 1.52, p.z, 0, yaw, 0));
+        add('marble', new THREE.SphereGeometry(0.15, 10, 8), M4Y(p.x, 2.3, p.z, 0, yaw, 0));
+        add('marble', new THREE.CylinderGeometry(0.05, 0.06, 0.6, 6), M4Y(p.x + Math.sin(yaw) * 0.12, 1.85, p.z + Math.cos(yaw) * 0.12, 0.9, yaw, 0));
+        for (const sd of [-1, 1]) add('marble', new THREE.BoxGeometry(0.06, 1.0, 0.5), M4Y(p.x - Math.sin(yaw) * 0.18 + Math.cos(yaw) * sd * 0.28, 1.95, p.z - Math.cos(yaw) * 0.18 - Math.sin(yaw) * sd * 0.28, -0.35, yaw + sd * 0.5, 0));
+        break;
+      }
+      case 'coffin': { const yaw = p.rot || 0; add('coffin', new THREE.BoxGeometry(0.7, 0.42, 1.9), M4Y(p.x, 0.21, p.z, 0, yaw, 0)); add('coffin', new THREE.BoxGeometry(0.74, 0.07, 1.95), M4Y(p.x + Math.cos(yaw) * 0.25, 0.47, p.z - Math.sin(yaw) * 0.25, 0, yaw + 0.35, 0)); break; }
+      case 'lantern': cyl('iron', p.x, 0.75, p.z, 0.04, 0.05, 1.5, 6); box('iron', p.x, 1.62, p.z, 0.26, 0.04, 0.26); W.fx.flames.push([p.x, 1.42, p.z]); break;
       case 'tentpole': break;
       case 'pole': cyl('pole', p.x, 3, p.z, 0.08, 0.11, 6, 8); box('pole', p.x, 5.8, p.z, 0.9, 0.08, 0.08); break;
       case 'carouselcore': cyl('gold', p.x, 2.1, p.z, 0.85, 0.85, 4.2, 18); cyl('mirror', p.x, 2.1, p.z, 0.87, 0.87, 1.4, 18); break;
@@ -181,11 +227,31 @@ export function buildThemeExtras(W, M, quality, R) {
       }
     }
   }
-  // ---------- snow: log piles, the truck ----------
+  // ---------- snow: log piles, the truck; graveyard: graves, mounds, fences, tower ----------
+  const bars = [], tips = [];
   for (const b of M.boxes) {
     if (b.kind === 'logpile') {
       const along = b.hx > b.hz, L = (along ? b.hx : b.hz) * 2;
       for (let row = 0; row < 4; row++) for (let k = 0; k < 4 - row; k++) { const o = (k - (3 - row) / 2) * 0.34, y = 0.17 + row * 0.3; add('log', new THREE.CylinderGeometry(0.17, 0.17, L, 9), M4(b.x + (along ? 0 : o), y, b.z + (along ? o : 0), along ? 0 : Math.PI / 2, 0, along ? Math.PI / 2 : 0)); }
+    } else if (b.kind === 'pit') {
+      // an open grave: a black hole with a dirt lip
+      add('hole', new THREE.BoxGeometry(b.hx * 2 - 0.1, 0.02, b.hz * 2 - 0.1), M4(b.x, 0.012, b.z));
+      for (const [ox, oz, w, d] of [[0, b.hz, b.hx * 2 + 0.3, 0.16], [0, -b.hz, b.hx * 2 + 0.3, 0.16], [b.hx, 0, 0.16, b.hz * 2], [-b.hx, 0, 0.16, b.hz * 2]]) add('dirt', new THREE.BoxGeometry(w, 0.14, d), M4(b.x + ox, 0.07, b.z + oz));
+    } else if (b.kind === 'mound') {
+      add('dirt', new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), M4(b.x, 0, b.z, 0, 0, 0, b.hx * 1.1, b.h, b.hz * 1.1));
+    } else if (b.kind === 'monument') {
+      const cap = new THREE.ConeGeometry(1, 0.7, 4); cap.rotateY(Math.PI / 4); add('stoneCap', cap, M4(b.x, b.h + 0.35, b.z, 0, 0, 0, b.hx * 1.5, 1, b.hz * 1.5));
+      add('stoneCap', new THREE.BoxGeometry(b.hx * 2 + 0.2, 0.2, b.hz * 2 + 0.2), M4(b.x, 0.1, b.z));
+    } else if (b.kind === 'tower') {
+      add('slate', new THREE.ConeGeometry(Math.max(b.hx, b.hz) * 1.6, 3.6, 4), M4(b.x, b.h + 1.8, b.z, 0, Math.PI / 4, 0));
+      add('iron', new THREE.BoxGeometry(0.08, 1.1, 0.08), M4(b.x, b.h + 4.1, b.z)); add('iron', new THREE.BoxGeometry(0.55, 0.08, 0.08), M4(b.x, b.h + 4.3, b.z));
+      for (const [ox, oz] of [[b.hx, 0], [-b.hx, 0], [0, b.hz], [0, -b.hz]]) add('hole', new THREE.BoxGeometry(ox ? 0.04 : 0.8, 1.4, oz ? 0.04 : 0.8), M4(b.x + ox * 1.01, b.h - 1.6, b.z + oz * 1.01));
+    } else if (b.style === 'iron') {
+      // wrought-iron fence: bars with spear tips between two rails, posts at the ends
+      const along = b.hx > b.hz, L = (along ? b.hx : b.hz) * 2, n = Math.max(2, Math.round(L / 0.17));
+      for (let k = 0; k <= n; k++) { const o = -L / 2 + L * k / n, x = b.x + (along ? o : 0), z = b.z + (along ? 0 : o); bars.push(M4(x, b.h / 2, z, 0, 0, 0, 1, b.h, 1)); tips.push(M4(x, b.h + 0.07, z)); }
+      for (const y of [0.25, b.h - 0.18]) add('iron', new THREE.BoxGeometry(along ? L : 0.05, 0.05, along ? 0.05 : L), M4(b.x, y, b.z));
+      for (const sd of [-1, 1]) add('iron', new THREE.BoxGeometry(0.12, b.h + 0.2, 0.12), M4(b.x + (along ? sd * L / 2 : 0), (b.h + 0.2) / 2, b.z + (along ? 0 : sd * L / 2)));
     } else if (b.kind === 'truck') {
       const along = b.hx > b.hz;
       for (const s1 of [-1, 1]) for (const s2 of [-0.6, 0.6]) add('tyre', new THREE.CylinderGeometry(0.45, 0.45, 0.3, 14), M4(b.x + (along ? s2 * b.hx * 1.2 : s1 * (b.hx + 0.1)), 0.45, b.z + (along ? s1 * (b.hz + 0.1) : s2 * b.hz * 1.2), along ? Math.PI / 2 : 0, 0, along ? 0 : Math.PI / 2));
@@ -193,12 +259,26 @@ export function buildThemeExtras(W, M, quality, R) {
     }
   }
   const MATS = {
+    grave: () => mat(0xb2b0a8, { map: 'stone', rough: 0.9 }), marble: () => mat(0xc8c6be, { map: 'stone', rough: 0.7 }), dirt: () => mat(0x34281c, { map: 'ground2', rough: 1 }),
+    hole: () => new THREE.MeshBasicMaterial({ color: 0x050403 }), coffin: () => mat(0x4a2e1e, { map: 'wood', rough: 0.8 }), iron: () => mat(0x26262a, { metal: 0.6, rough: 0.55 }),
+    slate: () => mat(0x3e434c, { map: 'stone', rough: 0.9 }), shingle: () => mat(0x5a4a3a, { map: 'boards', rough: 0.95 }), stoneCap: () => mat(0xa8a49a, { map: 'stone', rough: 0.95 }),
+    beam: () => mat(0x3a2e24, { map: 'wood', rough: 1 }), gableS: () => mat(0xb4b0a6, { map: 'stone', rough: 0.95, side: 2 }), gableW: () => mat(0xb09a80, { map: 'wood', rough: 0.95, side: 2 }),
     plank: () => mat(0x9a8a70, { map: 'boards', rough: 0.95 }), post: () => mat(0x4a3a2a, { map: 'bark' }), pole: () => mat(0x3a3430, { map: 'metal', metal: 0.5, rough: 0.6 }),
     barrel: () => mat(0x8a2a1a, { map: 'metal', metal: 0.3, rough: 0.6 }), hoop: () => mat(0x3a3a38, { metal: 0.7, rough: 0.4 }), crate: () => mat(0xb09a80, { map: 'wood' }),
     cartbody: () => mat(0xc02020, { metal: 0.3, rough: 0.5 }), glass: () => new THREE.MeshStandardMaterial({ color: 0x8aa0a8, roughness: 0.05, metalness: 0.5, transparent: true, opacity: 0.45 }),
     stripe: () => mat(0xe8d8b0, { map: 'canvas' }), tyre: () => mat(0x141414, { rough: 0.9 }), gold: () => mat(0xc8a040, { metal: 0.85, rough: 0.3 }),
     mirror: () => new THREE.MeshStandardMaterial({ color: 0xd8d8e0, roughness: 0.05, metalness: 1 }), horse: () => mat(0xe8e0d0, { rough: 0.4 }), log: () => mat(0x8a6a4a, { map: 'bark', rough: 1 }),
   };
+  if (bars.length) {
+    const ironM = MATS.iron();
+    const bi = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.018, 0.018, 1, 5), ironM, bars.length); bars.forEach((m, i) => bi.setMatrixAt(i, m)); bi.castShadow = true; scene.add(bi);
+    const ti = new THREE.InstancedMesh(new THREE.ConeGeometry(0.04, 0.16, 4), ironM, tips.length); tips.forEach((m, i) => ti.setMatrixAt(i, m)); scene.add(ti);
+  }
+  if (W.fx.flames.length) {
+    const fm = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffa040).multiplyScalar(2.5), toneMapped: false });
+    const fi = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.2, 0.16), fm, W.fx.flames.length); W.fx.flames.forEach(([x, y, z], i) => fi.setMatrixAt(i, M4(x, y, z))); scene.add(fi);
+    W.fx.flameM = fm;
+  }
   for (const k in groups) { const m = new THREE.Mesh(mergeGeos(groups[k]), (MATS[k] || MATS.crate)()); m.castShadow = k !== 'glass'; m.receiveShadow = true; scene.add(m); }
 
   // ---------- carnival string lights ----------
@@ -221,6 +301,7 @@ export function buildThemeExtras(W, M, quality, R) {
 
   // ---------- particles ----------
   if (LK.particles === 'snow' && quality !== 'potato') W.fx.snow = particles(scene, lite ? 600 : 1600, 0xf0f4ff, 0.06, 0.8, R, 0, 14);
+  if (LK.particles === 'wisps' && quality !== 'potato') W.fx.flies = particles(scene, lite ? 40 : 110, 0x9ad8ff, 0.08, 0.8, R, 0.3, 2.6);
   if (LK.particles === 'fireflies' && quality !== 'potato') W.fx.flies = particles(scene, lite ? 60 : 160, 0xd8ff70, 0.07, 0.9, R, 0.3, 3.2);
 }
 
@@ -236,5 +317,6 @@ export function updateThemeFx(W, t, dt, follow) {
   };
   wrap(F.snow, (x, y, z, i) => [x + Math.sin(t * 0.6 + i) * 0.6 + t * 0.4, ((y - t * (0.9 + (i % 5) * 0.12)) % 14 + 14) % 14, z + Math.cos(t * 0.5 + i * 0.7) * 0.6]);
   wrap(F.flies, (x, y, z, i) => [x + Math.sin(t * 0.3 + i * 1.7) * 2, y + Math.sin(t * 0.8 + i) * 0.4, z + Math.cos(t * 0.25 + i * 2.3) * 2]);
+  if (F.flameM) F.flameM.color.setHex(0xffa040).multiplyScalar((2.2 + Math.sin(t * 9) * 0.3 + Math.sin(t * 23) * 0.2) * (1 - dk * 0.8));
   if (F.flies) F.flies.pts.material.opacity = (0.55 + Math.sin(t * 3.1) * 0.35) * (1 - dk * 0.5);
 }

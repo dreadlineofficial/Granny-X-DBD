@@ -4,7 +4,7 @@
 // offline single-file build never load them.
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
-import { GFX, realistic } from './gfx.js';
+import { GFX, realistic, PERF } from './gfx.js';
 
 // size: metres one copy of the scan covers. detail: relief + roughness only (the surface keeps its own colour)
 const SETS = {
@@ -25,7 +25,7 @@ export const ROLE = {
 // ground per map look: [open ground, worn trails / mud]
 const GROUND = {
   woods: ['brown_mud_leaves_01', 'stony_dirt_path'], granny: ['leaves_forest_ground', 'stony_dirt_path'],
-  marsh: ['mud_forest', 'brown_mud_02'], carnival: ['park_dirt', 'rocky_trail'], snow: ['snow_02', 'snow_field_aerial'],
+  marsh: ['mud_forest', 'brown_mud_02'], carnival: ['park_dirt', 'rocky_trail'], snow: ['snow_02', 'snow_field_aerial'], grave: ['leaves_forest_ground', 'stony_dirt_path'],
 };
 export const groundSets = look => GROUND[look] || GROUND.woods;
 
@@ -36,7 +36,7 @@ export const photoOn = () => !!loader && realistic();
 
 // start streaming every scan (called once the renderer exists, realistic look, medium/high quality)
 export function initPhoto(renderer, quality) {
-  if (loader || !realistic() || quality === 'potato' || quality === 'low' || location.protocol === 'file:') return;
+  if (loader || !realistic() || quality === 'potato' || quality === 'low' || PERF.on || location.protocol === 'file:') return;
   try {
     loader = new KTX2Loader().setTranscoderPath((dev() ? '' : 'public/') + 'vendor/three/addons/libs/basis/').detectSupport(renderer);
   } catch (e) { console.warn('photo textures unavailable', e); loader = null; return; }

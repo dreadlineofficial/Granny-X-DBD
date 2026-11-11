@@ -1,4 +1,5 @@
 // Synthesized audio (WebAudio), plus a few recorded voice clips for sidekicks.
+import { b64buf } from './heavy.js';
 export class Sound {
   constructor() { this.ctx = null; this.vol = 0.8; this.music = 0.7; this.lx = 0; this.lz = 0; this.lyaw = 0; }
   init() {
@@ -250,7 +251,7 @@ export class Sound {
 const clips = {}, clipLoading = {};
 async function clipBytes(name) {
   const el = document.getElementById('nb-voice-' + name);
-  if (el && el.textContent.trim()) { const s = atob(el.textContent.trim()), b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b.buffer; }
+  if (el && el.textContent.trim()) { return b64buf(el.textContent.trim()); }
   const dev = !!document.querySelector('script[type=importmap]');
   for (const url of dev ? [`audio/${name}.mp3`, `public/audio/${name}.mp3`] : [`public/audio/${name}.mp3`, `audio/${name}.mp3`]) {
     try { const r = await fetch(url); if (r.ok) return await r.arrayBuffer(); } catch (_) {}

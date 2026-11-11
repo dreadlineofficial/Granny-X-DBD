@@ -962,3 +962,14 @@ html:not(.mobile) .mobile-only { display: none !important; }
 #tc-editor .tc-atk, #tc-editor .tc-light { width: 150px; height: 112px; font-size: 24px; border-radius: 50%; }
 #tc-editor .tc-b.placed { position: absolute; margin: 0; }
 #tc-editor .tc-b.sel { border-color: #ffd23a; box-shadow: 0 0 18px rgba(255,210,58,.55); opacity: 1; }
+/* 1.3.3 touch buttons: a picture over the name */
+#touch .tc-b, #tc-editor .tc-b { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px 6px; }
+#touch .tc-ic, #tc-editor .tc-ic { display: block; width: 32px; height: 32px; line-height: 0; }
+#touch .tc-ic svg, #tc-editor .tc-ic svg { width: 100%; height: 100%; }
+#touch .tc-lb, #tc-editor .tc-lb { display: block; font-size: 15px; letter-spacing: .08em; }
+#touch .tc-atk .tc-ic, #touch .tc-light .tc-ic, #tc-editor .tc-atk .tc-ic, #tc-editor .tc-light .tc-ic { width: 48px; height: 48px; }
+#touch .tc-atk .tc-lb, #touch .tc-light .tc-lb, #tc-editor .tc-atk .tc-lb, #tc-editor .tc-light .tc-lb { font-size: 20px; }
+
+/* 1.3.3 optimization mode: the loading screen is a still picture */
+#loading.static .ls-3d { opacity: 1 !important; background: #050304 url(../img/granny-banner.webp) 62% center / cover no-repeat; filter: brightness(.55) saturate(.8); }
+#loading.static .ls-grain { display: none; }

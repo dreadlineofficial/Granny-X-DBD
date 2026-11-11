@@ -5,6 +5,7 @@
 //  - beartrap: "Granny bear trap" by Eri Game Dev (sketchfab.com/blerko0178), CC BY 4.0; its clip snaps the jaws shut
 //  - taser: "Taser Gun" by Mati236 (sketchfab.com/chenjunliu6), CC BY 4.0
 import * as THREE from 'three';
+import { b64buf, heavy } from './heavy.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // name -> how to normalise it: target size along an axis, where its origin goes
@@ -19,7 +20,7 @@ const tpl = {}, loading = {}, waiters = {};
 
 async function bytes(name) {
   const el = document.getElementById('nb-' + name + '-glb');
-  if (el && el.textContent.trim()) { const s = atob(el.textContent.trim()), b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b.buffer; }
+  if (el && el.textContent.trim()) { return b64buf(el.textContent.trim()); }
   const dev = !!document.querySelector('script[type=importmap]');
   let last;
   for (const url of dev ? [`models/${name}.glb`, `public/models/${name}.glb`] : [`public/models/${name}.glb`, `models/${name}.glb`]) {
@@ -30,7 +31,7 @@ async function bytes(name) {
 
 export function loadStatic(name) {
   if (loading[name]) return loading[name];
-  loading[name] = bytes(name).then(buf => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej))).then(g => {
+  loading[name] = bytes(name).then(buf => heavy(() => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)))).then(g => {
     const S = SPEC[name], inner = g.scene;
     inner.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(inner), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());

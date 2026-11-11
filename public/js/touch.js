@@ -32,7 +32,34 @@ export function mobileText(s, char) {
     .replace(/\bRMB\b/g, R_BTN[char] ? 'POWER' : 'LIGHT').replace(/\bLMB\b/g, 'ATTACK');
 }
 
+import { icon } from './icons.js';
 const $ = id => document.getElementById(id);
+// 1.3.3: every touch button shows a picture as well as its name (64x64 line art like icons.js)
+const SV = body => `<svg class="ico" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const TC_ICONS = {
+  use: SV('<path d="M24 34V14a4 4 0 0 1 8 0v16M32 28V10a4 4 0 0 1 8 0v18M40 28V14a4 4 0 0 1 8 0v20c0 12-7 20-17 20-7 0-11-4-15-10l-6-10a4 4 0 0 1 7-4l5 6"/>'),
+  jump: SV('<path d="M6 52h52"/><path d="M22 52V40h20v12"/><circle cx="16" cy="14" r="5"/><path d="M12 30c6-10 18-14 30-10l8 6M18 22l-6 12 8 4M42 20l4 12"/>'),
+  run: SV('<circle cx="38" cy="10" r="5"/><path d="M30 20l-10 6-6 10M30 20l8 10 10 2M30 20l-4 14 10 8-2 14M26 34l-10 8-8 0"/>'),
+  crouch: SV('<circle cx="30" cy="18" r="5"/><path d="M28 26l-8 12 12 4 6 14M28 26l10 8 10-2M20 38l-8 12"/>'),
+  status: SV('<path d="M14 14h36M14 26h36M14 38h24M14 50h18"/><circle cx="48" cy="46" r="7"/>'),
+  emote: SV('<circle cx="32" cy="32" r="22"/><circle cx="24" cy="27" r="2.6"/><circle cx="40" cy="27" r="2.6"/><path d="M22 38c6 8 14 8 20 0"/>'),
+  hear: SV('<path d="M22 44c0 6 4 10 9 10 6 0 8-6 10-10 3-6 9-8 9-18a18 18 0 0 0-36 0"/><path d="M26 28a6 6 0 0 1 12 0c0 6-6 6-6 12"/><path d="M52 14l6-4M54 26h6"/>'),
+  lull: SV('<path d="M24 46V14l26-6v32"/><ellipse cx="18" cy="46" rx="7" ry="5"/><ellipse cx="44" cy="40" rx="7" ry="5"/><path d="M24 24l26-6"/>'),
+  creep: SV('<ellipse cx="20" cy="40" rx="6" ry="9"/><ellipse cx="44" cy="22" rx="6" ry="9"/><circle cx="16" cy="27" r="2"/><circle cx="21" cy="26" r="2"/><circle cx="26" cy="27" r="2"/><circle cx="40" cy="9" r="2"/><circle cx="45" cy="8" r="2"/><circle cx="50" cy="9" r="2"/>'),
+  swap: SV('<path d="M12 22h36l-8-8M52 42H16l8 8"/>'),
+  drop: SV('<path d="M32 10v32M20 32l12 12 12-12M14 54h36"/>'),
+  take: SV('<circle cx="32" cy="16" r="6"/><path d="M22 54l4-20h12l4 20M10 28a24 24 0 0 1 8-12M54 28a24 24 0 0 0-8-12"/>'),
+  next: SV('<path d="M14 32h34M36 18l14 14-14 14"/>'),
+  bat: SV('<path d="M14 52l6 6 30-34a9 9 0 0 0-12-12z"/><path d="M14 52l-4 4"/><path d="M40 16l8 8" stroke-dasharray="3 4"/>'),
+  ghost: SV('<path d="M16 54V28a16 16 0 0 1 32 0v26l-6-5-5 5-5-5-5 5-5-5z"/><circle cx="26" cy="28" r="3"/><circle cx="38" cy="28" r="3"/>'),
+};
+const POWER_PIC = { granny: 'bat', grandpa: 'shotgun', slendrina: 'ghost', angeline: 'eyes' };
+function picOf(id, kind) {
+  if (id === 'power') { const c = (kind || '').split('-')[1] || ctxChar; const k = POWER_PIC[c] || 'bat'; return TC_ICONS[k] || icon(k); }
+  const lib = { atk: 'claws', light: 'flashlight', trap: 'beartrap', gaze: 'gaze', exec: 'exec' };
+  return lib[id] ? icon(lib[id]) : TC_ICONS[id] || '';
+}
+const btnHTML = (id, label, kind) => `<span class="tc-ic">${picOf(id, kind)}</span><span class="tc-lb">${label}</span>`;
 let ui = null, game = null, held = new Map(), stick = null, look = null, runOn = false, crouchOn = false, stickKeys = new Set();
 // 1.3.3: USE latches during a repair / heal (both thumbs free for skill checks); skill checks take a tap anywhere
 let useLatched = false, scSeen = 0;
@@ -151,7 +178,7 @@ function layout(kind) {
   // let go of anything held from the old layout
   for (const [id] of held) press(id, false); held.clear();
   box.dataset.kind = kind;
-  box.innerHTML = LAYOUT[kind].map(id => `<button data-b="${id}" class="tc-b tc-${id}">${BTN[id][0]}</button>`).join('');
+  box.innerHTML = LAYOUT[kind].map(id => `<button data-b="${id}" class="tc-b tc-${id}">${btnHTML(id, BTN[id][0], kind)}</button>`).join('');
   box.querySelectorAll('button').forEach(b => {
     const id = b.dataset.b;
     b.addEventListener('pointerdown', e => {
@@ -194,12 +221,12 @@ export function openTouchEditor(onClose) {
     ed.querySelectorAll('.te-tabs button').forEach(b => b.classList.toggle('on', b.dataset.g === group));
     area.querySelectorAll('.tc-b').forEach(b => b.remove());
     // where the buttons sit by default: lay them out like the game does and measure
-    meas.innerHTML = EDIT_SETS[group].map(id => `<button data-b="${id}" class="tc-b tc-${id}">${BTN[id][0]}</button>`).join('');
+    meas.innerHTML = EDIT_SETS[group].map(id => `<button data-b="${id}" class="tc-b tc-${id}">${btnHTML(id, BTN[id][0], group === 'killer' ? 'killer-granny' : group)}</button>`).join('');
     const def = {}; meas.querySelectorAll('.tc-b').forEach(b => { const r = b.getBoundingClientRect(); def[b.dataset.b] = { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight }; });
     area.style.setProperty('--tc-op', W.op);
     for (const id of EDIT_SETS[group]) {
       const k = group + ':' + slotOf(id), p = W.pos[k] || { ...def[id], s: 1 };
-      const b = document.createElement('button'); b.className = `tc-b tc-${id} placed` + (sel === k ? ' sel' : ''); b.dataset.b = id; b.textContent = id === 'hear' ? 'POWER 2' : BTN[id][0];
+      const b = document.createElement('button'); b.className = `tc-b tc-${id} placed` + (sel === k ? ' sel' : ''); b.dataset.b = id; b.innerHTML = btnHTML(id, id === 'hear' ? 'POWER 2' : BTN[id][0], group === 'killer' ? 'killer-granny' : group);
       const place = () => { b.style.left = (p.x * 100) + '%'; b.style.top = (p.y * 100) + '%'; b.style.transform = `translate(-50%, -50%) scale(${(p.s || 1) * W.scale})`; };
       place();
       let drag = null;
@@ -243,7 +270,7 @@ export function initTouch() {
     if (me) setTouchCtx(me.st === 'dead' || me.st === 'out' ? 'spectator' : me.role, me.char);
     layout(!me || me.st === 'dead' || me.st === 'out' || me.st === 'ghost' ? 'dead' : me.role === 'killer' ? (LAYOUT['killer-' + me.char] ? 'killer-' + me.char : 'killer') : 'survivor');
     const jb = ui.querySelector('[data-b=jump]'), skill = $('skill') && !$('skill').classList.contains('hidden');
-    if (jb) jb.textContent = skill ? 'HIT!' : 'VAULT';
+    const jl = jb && jb.querySelector('.tc-lb'); if (jl) jl.textContent = skill ? 'HIT!' : 'VAULT';
     if (useLatched && !working() && !(g.skill)) unlatch();
     scHint(g);
   }, 200);

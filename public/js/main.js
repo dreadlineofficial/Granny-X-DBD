@@ -4,9 +4,9 @@ import { buildMap } from './map.js';
 import { Sim } from './sim.js';
 import { Bots } from './bots.js';
 import { Game } from './game.js';
-import { QUALITY } from './world.js';
+import { QUALITY, applyPerf } from './world.js';
 import { setDetail } from './models.js';
-import { setStyle, realistic, nightEnv, refreshEnvs } from './gfx.js';
+import { setStyle, realistic, nightEnv, refreshEnvs, PERF } from './gfx.js';
 import { initPhoto } from './pbr.js';
 import { MenuScene } from './menu.js';
 import { loadForeman, onForemanReady, loadBatman } from './foremanGlb.js';
@@ -129,7 +129,7 @@ let renderer = null;
 function makeRenderer() {
   if (renderer) { renderer.dispose(); renderer.domElement.remove(); }
   const q = QUALITY[settings.quality];
-  const lite = settings.quality === 'potato' || settings.quality === 'low';
+  const lite = settings.quality === 'potato' || settings.quality === 'low' || PERF.on;
   renderer = new THREE.WebGLRenderer({ antialias: !lite, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.35 * (settings.brightness || 1);
@@ -161,13 +161,14 @@ function watchContext(canvas) {
     refreshEnvs(renderer, [menu && menu.scene, session && session.game && session.game.scene]);
   });
 }
+applyPerf(!!settings.perf); // 1.3.3 optimization mode
 makeRenderer();
 
 function toast(msg, ms = 3500) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), ms);
 }
-function loading(on, text) { showLoading(on, text, settings.quality === 'potato' || settings.quality === 'low', () => renderer); }
+function loading(on, text) { showLoading(on, text, settings.quality === 'potato' || settings.quality === 'low' || PERF.on, () => renderer); }
 window.__showLoading = loading; // (trailer / test capture)
 const nextFrame = () => new Promise(r => setTimeout(r, 40));
 const warmMsg = msg => loading(true, msg);
@@ -218,6 +219,14 @@ async function waitForModels(need) {
   await Promise.race([Promise.all([loadChucky(), loadSlappy()]), new Promise(r => setTimeout(r, 20000))]);
 }
 onForemanReady(() => { if (menu && menu.killerChar === 'foreman') menu.setKiller('foreman', menu.killerSkin); });
+// 1.3.3: the menu's shaders are compiled in the background while the loading screen is still up (where the device can
+// compile in the background): the menu used to freeze for seconds the moment it appeared
+function warmMenu() {
+  const r = renderer;
+  if (!menu || !r || !r.extensions.has('KHR_parallel_shader_compile')) return Promise.resolve();
+  try { r.setRenderTarget(null); const p = r.compileAsync(menu.scene, menu.camera); return Promise.race([p.catch(() => {}), new Promise(res => setTimeout(res, 15000))]); }
+  catch (e) { return Promise.resolve(); }
+}
 function stopBG() { if (menu) { menu.dispose(); menu = null; } }
 function setScene(mode) { menuMode = mode; if (menu) menu.setMode(mode); renderShowcase(); }
 
@@ -464,7 +473,7 @@ function renderSettings() {
   $('set-name').value = settings.name;
   setSeg('set-quality', settings.quality); $('set-quality-hint').textContent = QHINT[settings.quality];
   setSeg('set-style', settings.style === 'classic' ? 'classic' : 'realistic'); $('set-style-hint').textContent = SHINT[settings.style === 'classic' ? 'classic' : 'realistic'];
-  $('set-dynres').checked = settings.dynres !== false; $('set-fps').checked = !!settings.showFps;
+  $('set-dynres').checked = settings.dynres !== false; $('set-perf').checked = !!settings.perf; $('set-fps').checked = !!settings.showFps;
   $('set-bright').value = settings.brightness || 1; $('set-bright-v').textContent = Math.round((settings.brightness || 1) * 100) + '%';
   $('set-sens').value = settings.sens; $('set-sens-v').textContent = (+settings.sens).toFixed(2);
   $('set-fov').value = settings.fov; $('set-fov-v').textContent = settings.fov;
@@ -484,6 +493,7 @@ const SHINT = {
 seg('set-style', v => { settings.style = v; saveSettings(); $('set-style-hint').textContent = SHINT[v]; stopBG(); makeRenderer(); startBG(); });
 seg('set-quality', v => { settings.quality = v; saveSettings(); $('set-quality-hint').textContent = QHINT[v]; stopBG(); makeRenderer(); startBG(); });
 $('set-dynres').addEventListener('change', e => { settings.dynres = e.target.checked; saveSettings(); });
+$('set-perf').addEventListener('change', e => { settings.perf = e.target.checked; if (settings.perf) settings.dynres = true; saveSettings(); applyPerf(settings.perf); stopBG(); makeRenderer(); startBG(); toast(settings.perf ? 'Optimization mode on: lighter graphics, smoother play.' : 'Optimization mode off.'); });
 $('set-fps').addEventListener('change', e => { settings.showFps = e.target.checked; saveSettings(); });
 $('set-bright').addEventListener('input', e => { settings.brightness = +e.target.value; saveSettings(); $('set-bright-v').textContent = Math.round(settings.brightness * 100) + '%'; if (renderer) renderer.toneMappingExposure = 1.35 * settings.brightness; if (session && session.game && session.game.W) session.game.W.base = null; });
 $('set-sens').addEventListener('input', e => { settings.sens = +e.target.value; $('set-sens-v').textContent = settings.sens.toFixed(2); saveSettings(); });
@@ -934,7 +944,7 @@ $('btn-bots-start').addEventListener('click', () => {
   if (botsCfg.map === 'vote') botVote(gm, roster.filter(r => r.bot).length, go); else go(botsCfg.map);
 });
 // ---------- map select screen (Rivals style): pictures, live tallies, a countdown ----------
-const MAP_IMG = id => (document.querySelector('script[type=importmap]') ? '' : 'public/') + 'img/maps/' + id + '.jpg';
+const MAP_IMG = id => (window.__MAPIMG && window.__MAPIMG[id]) || (document.querySelector('script[type=importmap]') ? '' : 'public/') + 'img/maps/' + id + '.jpg';
 const mapName = c => c === 'random' ? 'Random' : MAP_NAMES[c] || c;
 function voteCands(gm) {
   const pool = MODES[gm] && MODES[gm].bigMap ? Object.keys(BIG_MAPS) : REGULAR_MAPS.slice();
@@ -1788,6 +1798,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && !$('announce').clas
   Promise.race([Promise.all([loadScene('granny_map'), loadGranny(), loadGrandpa()]), new Promise(r => setTimeout(r, 30000))])
     // then a few seconds of Granny on screen before the menu
     .then(() => new Promise(r => { const iv = setInterval(() => { const s = sceneShownAt(); if ((s && Date.now() - s > 4500) || Date.now() - t0 > 40000) { clearInterval(iv); r(); } }, 200); }))
+    .then(() => warmMenu())
     .then(() => { if (!session && !window.__gdHold) loading(false); });
 }
 

@@ -3,6 +3,7 @@
 // animation: every joint is posed procedurally (a stiff, puppet-like idle, walk and run, an
 // overhead mallet swing, pounce, carry, stun and execution). He carries an iron-banded mallet.
 import * as THREE from 'three';
+import { b64buf, heavy } from './heavy.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { HEIGHT } from './chuckyGlb.js';
@@ -16,7 +17,7 @@ export function onSlappyReady(cb) { if (gltf) cb(); else waiters.push(cb); }
 
 async function bytes() {
   const el = document.getElementById('nb-slappy-glb');
-  if (el && el.textContent.trim()) { const s = atob(el.textContent.trim()), b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b.buffer; }
+  if (el && el.textContent.trim()) { return b64buf(el.textContent.trim()); }
   const dev = !!document.querySelector('script[type=importmap]'); let last;
   for (const url of dev ? ['models/slappy.glb', 'public/models/slappy.glb'] : ['public/models/slappy.glb', 'models/slappy.glb']) {
     try { const r = await fetch(url); if (r.ok) return await r.arrayBuffer(); last = new Error(url + ' ' + r.status); } catch (e) { last = e; }
@@ -34,7 +35,7 @@ function restOf(scene) {
 
 export function loadSlappy() {
   if (loading) return loading;
-  loading = bytes().then(buf => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej))).then(g => {
+  loading = bytes().then(buf => heavy(() => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)))).then(g => {
     g.animations = [];
     const S = restOf(g.scene);
     const box = new THREE.Box3().setFromObject(g.scene), h = box.max.y - box.min.y, s = HEIGHT * 1.02 / h;

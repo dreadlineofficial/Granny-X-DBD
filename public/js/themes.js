@@ -189,9 +189,88 @@ const snow = {
   },
 };
 
-export const THEMES = { marsh, carnival, snow };
-export const MAP_NAMES = { granny: "Granny's House", granny1: "Granny's Old House" };
+// ---------------- Slendrina's Graveyard (1.3.3): a ruined church, crypts, grave rows, iron fences ----------------
+// Built from scratch for 1.3.3. Iron fences are low (1.6m): they block feet, not eyes. Open graves are holes you
+// walk round. Walls of roofed buildings keep a straight top (noRuin) so the roof sits on them.
+const stone = (C, x, z, h = 1.0) => prop(C, x, z, 0.32, h, 'headstone');
+const cross = (C, x, z) => prop(C, x, z, 0.24, 1.7, 'cross');
+const angel = (C, x, z) => prop(C, x, z, 0.5, 2.6, 'angel');
+const lantern = (C, x, z) => prop(C, x, z, 0.16, 1.5, 'lantern');
+const keepTop = (M, n0) => { for (let i = n0; i < M.boxes.length; i++) M.boxes[i].noRuin = true; };
+const roof = (M, C, x1, z1, x2, z2, y, kind = 'slate') => M.visual.push({ type: 'roof', ...rect(C, x1, z1, x2, z2), y, kind });
+const pit = (C, x, z, along) => { C.box(x, z, along ? 1.1 : 0.55, along ? 0.55 : 1.1, 0.4, 'pit', 'dirt'); C.box(x + (along ? 0 : 1.15), z + (along ? 1.15 : 0), along ? 1.0 : 0.45, along ? 0.45 : 1.0, 0.9, 'mound', 'dirt'); };
+const grave = {
+  name: "Slendrina's Graveyard", style: 'stone', boundary: 'stone', center: 'church',
+  names: ['crypt', 'rows', 'plot', 'graves', 'shed', 'tombs', 'open', 'crypt', 'rows', 'plot', 'graves', 'tombs'],
+  scatter: { n: 95, tree: 0.55, prop: { p: 0.55, kinds: [{ id: 'headstone', r: 0.32, h: 1.0 }, { id: 'headstone', r: 0.32, h: 1.0 }, { id: 'cross', r: 0.24, h: 1.7 }] } },
+  templates(S, M) {
+    return {
+      // the ruined church in the middle: nave with windows, a pallet door each end, a bell tower on one corner
+      church(C) {
+        C.windowWall(-8, -5.5, -2, -5.5, S, 0.5); C.doorWall(-2, -5.5, 2, -5.5, S, 0.5, 2.0, true); C.windowWall(2, -5.5, 8, -5.5, S, 0.5);
+        C.windowWall(8, 5.5, 0, 5.5, S, 0.5); C.doorWall(0, 5.5, -8, 5.5, S, 0.45, 1.9);
+        C.doorWall(8, -5.5, 8, 5.5, S, 0.5, 2.0, true); C.windowWall(-8, 5.5, -8, -5.5, S, 0.5);
+        C.windowWall(-3, -2, -3, 3.2, S, 0.5, 1.4);
+        C.box(5.6, 3.2, 1.0, 0.45, 1.0, 'altar', 'stone');
+        C.box(-6, -3.1, 0.3, 1.1, 0.85, 'pew', 'dark'); C.box(-6, 3.1, 0.3, 1.1, 0.85, 'pew', 'dark');
+        C.box(7.2, 7.0, 1.15, 1.15, 8.5, 'tower', 'stone');
+        M.visual.push({ type: 'nave', ...rect(C, -8, -5.5, 8, 5.5) });
+        lantern(C, -3.1, -6.6); lantern(C, 3.1, -6.6);
+        return { G: [2.5, -0.5], C: null, trees: [] };
+      },
+      // a stone mausoleum you can run through: pallet door, one window, angels outside
+      crypt(C) {
+        const n0 = M.boxes.length;
+        C.seg(-3, -2.4, 3, -2.4, S); C.seg(3, -2.4, 3, 2.4, S); C.doorWall(3, 2.4, -3, 2.4, S, 0.5, 1.7, true); C.windowWall(-3, 2.4, -3, -2.4, S, 0.5, 1.3);
+        keepTop(M, n0); roof(M, C, -3.4, -2.8, 3.4, 2.8, 3.1);
+        angel(C, -5.2, -4.6); angel(C, 5.2, 4.8); stone(C, -6.5, 1.5); stone(C, 6.2, -1.2);
+        return { G: [5.6, -4.6], C: [-6, 5.8], trees: [[-7, -7], [7.5, 1.5]] };
+      },
+      // rows of headstones either side of a wall with a window and a pallet
+      rows(C) {
+        C.seg(-7, 0, -1, 0, S, 2.6); C.barricade(0, 0, 'z', 0.85); C.windowWall(1, 0, 7, 0, S, 0.55, 1.5, 2.6);
+        for (const z of [-5.6, -3.0, 3.0, 5.6]) for (const x of [-6.6, -4.6, -2.6, 2.6, 4.6, 6.6]) if (C.R() < 0.85) stone(C, x, z, 0.8 + C.R() * 0.5);
+        return { G: [0, -4.3], C: [0, 4.4], trees: [[-8, 8], [8, -8]] };
+      },
+      // a family plot: iron fence round a statue, a pallet in one side, a gap in the other
+      plot(C) {
+        const F = 'iron', h = 1.6;
+        C.seg(-4, -4, 4, -4, F, h); C.seg(4, -4, 4, -1, F, h); C.barricade(4, 0, 'x', 0.85); C.seg(4, 1, 4, 4, F, h);
+        C.seg(4, 4, -4, 4, F, h); C.seg(-4, 4, -4, 1.3, F, h); C.seg(-4, -1.3, -4, -4, F, h);
+        angel(C, 0, 0); stone(C, -2.2, -2.4); stone(C, 2.2, -2.4); stone(C, -2.2, 2.4); stone(C, 2.2, 2.4);
+        C.seg(-7.5, 6.5, -2, 6.5, S, 2.6); C.windowWall(6.5, -7.5, 6.5, -1.5, S, 0.5, 1.4, 2.6);
+        return { G: [-6.2, -5.6], C: [6.2, 6.2], trees: [[-7.5, 2], [2, -7.5]] };
+      },
+      // open graves with their dirt piled up, a broken wall to loop
+      graves(C) {
+        C.windowWall(-6.5, -3, 2, -3, S, 0.4, 1.5, 2.8); C.seg(2, -3, 2, 3.3, S, 2.8); C.barricade(2, 4.3, 'x', 0.85); C.seg(2, 5.3, 2, 7, S, 2.8);
+        pit(C, -3.5, 2.2, true); pit(C, 5.2, -5.8, true); pit(C, 5.8, 1.0, false);
+        prop(C, -6.2, 0.2, 0.45, 0.5, 'coffin'); cross(C, -1.2, 1.4); cross(C, 4.2, -1.8);
+        return { G: [-4.6, 5.6], C: [6.6, 6.4], trees: [[-7.5, -7.2], [7.6, -2]] };
+      },
+      // the gravedigger's shed
+      shed(C) {
+        const n0 = M.boxes.length;
+        C.windowWall(-3.6, -2.6, 3.6, -2.6, 'wood'); C.seg(3.6, -2.6, 3.6, 2.6, 'wood'); C.doorWall(3.6, 2.6, -3.6, 2.6, 'wood', 0.7, 1.8); C.windowWall(-3.6, 2.6, -3.6, -2.6, 'wood');
+        keepTop(M, n0); roof(M, C, -4.0, -3.0, 4.0, 3.0, 3.0, 'boards');
+        C.seg(-7, -6.5, -7, -1.2, 'iron', 1.6); C.box(-7, 2, 0.8, 0.8, 1.5, 'crate', 'wood'); C.barricade(-7, 0.1, 'x', 0.88);
+        pit(C, 5.8, -5.6, true); lantern(C, 4.4, 3.4); prop(C, 6.4, 1.2, 0.45, 0.5, 'coffin');
+        return { G: [1.6, 0.3], C: [6.4, 6.0], trees: [[-6.5, 7], [7.5, -1.5]] };
+      },
+      // two tall monuments with a pallet between them, crosses round about
+      tombs(C) {
+        C.box(-2.5, 0, 1.5, 0.6, 2.4, 'monument', 'stone'); C.box(2.5, 0, 1.5, 0.6, 2.4, 'monument', 'stone'); C.barricade(0, 0, 'z', 0.88);
+        cross(C, -5, 4); cross(C, 5, -4); angel(C, 0, 6.4); stone(C, -5.4, -3.6); stone(C, 5.4, 3.4);
+        return { G: [4.5, 4.6], C: [-5, -4.8], trees: [[-7, -1], [7, 1], [1, -7.5]] };
+      },
+      open(C) { stone(C, -1, -1); stone(C, 0.6, -1.4, 0.8); cross(C, -2.4, 1.8); return { G: [2.5, 2.5], C: [-3.5, -4.5], trees: [[5, -5], [-6, -6], [6, 5], [-6, 6]] }; },
+    };
+  },
+};
+
+export const THEMES = { marsh, carnival, snow, grave };
+export const MAP_NAMES = { granny: "Granny's House", granny1: "Granny's Old House", grave: "Slendrina's Graveyard" };
 // Infection maps: twice the area of a regular map (7x7 cells instead of 5x5), built for a dozen
 // players: more generators, long sight lines broken up by loops, and spawns spread around the edges.
 export const BIG_MAPS = {};
-export const REGULAR_MAPS = ['granny', 'granny1'];
+export const REGULAR_MAPS = ['granny', 'granny1', 'grave'];

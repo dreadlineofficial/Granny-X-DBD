@@ -11,7 +11,9 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
   are not committed: rebuild them with the commands below.
 - **Killers: Granny, Grandpa (his own killer since 1.1, no longer an outfit), Slendrina and Angeline (1.3).**
 - **Survivors: only Mara, Eli, June and Tomás.**
-- **Maps: Granny's House (`granny`) and Granny's Old House (`granny1`).** No other maps.
+- **Maps: Granny's House (`granny`), Granny's Old House (`granny1`) and Slendrina's Graveyard (`grave`, added 1.3.3 at the
+  owner's request).** No other maps unless the owner asks. (The old marsh/carnival/snow themes are still in themes.js but
+  not in REGULAR_MAPS.)
 - Removed for good (don't bring back): sidekicks and their store section, ghost traps, all lore,
   Progress screen, Testing Area, ranks and levelling, the old intro banner / trailer gate.
 - Bots must never stall. **Falling off the roof of the house is fine: don't add barriers.**
@@ -222,7 +224,8 @@ the menu), `onlinestart.mjs` (host + client start a match through the local brok
   about the skin, and it should look like a proper trailer: Granny big in front with the bat, the other three backlit in fog,
   logo + red OFFICIAL TRAILER bar, teal/red grade, grain). Angeline faces the camera at yaw ~ -0.3 (not PI).
 
-1.3.3 (Nov 2026, current; APK versionCode 20): phone fixes from Discord feedback + Angeline's arms.
+1.3.3 (Nov 2026, current; APK versionCode 21, first 1.3.3 APK was 20): phone fixes from Discord feedback + Angeline's arms,
+then in the same version: new map, button icons, optimization mode, smoother loading, Freddy taller without the bat.
 - Emotes on mobile: the bar listened for mousedown and sat inside the HUD, under the touch layer (#touch z 25): on phones it's
   appended to body (`.touch-emotes`, z 28, big buttons) and uses pointerdown.
 - Skill checks on mobile (touch.js): while one is active a tap anywhere hits it (look/joystick area, any button incl. USE);
@@ -237,6 +240,24 @@ the menu), `onlinestart.mjs` (host + client start a match through the local brok
 - Angeline: hanging arms held out from her sides and a bit forward (`animateAngeline`, up/fo dirs); held close they sank
   into her bell-shaped dress.
 - Test: tools/test/mobile133.mjs (phone emulation: editor drag, emote tap, skill check by a left tap, USE latch at a gen).
+- New map **Slendrina's Graveyard** (`grave`): a theme in themes.js on the 5x5 arena (`buildMap` sends any THEMES id to
+  buildArena). Centre `church` (ruined nave, pallet doors, pews, altar, bell tower box kind 'tower' 8.5m), templates crypt
+  (roofed mausoleum, walls flagged `noRuin` so the roof sits), rows (headstones + wall/pallet/window), plot (iron fence ring
+  round an angel, pallet + gap), graves (open-grave boxes kind 'pit' h0.4 + 'mound'), shed, tombs (two 'monument' blocks +
+  pallet), open. Iron fences are walls with style 'iron', h1.6: under bots' 1.7m sight cut, so they block feet not eyes;
+  world.js skips drawing them (and pit/mound), themeworld.js draws bars/tips (instanced), graves, crosses, angels, coffins,
+  lanterns (flickering `W.fx.flames`), roofs (`visual: roof`), rafters (`visual: nave`), tower roof; LOOK.grave (cold mist,
+  dead trees, ruins, `particles: 'wisps'`). Vote card img/maps/grave.jpg. simtest grave x4 killers: 0 stall seconds.
+- Mobile buttons have pictures: TC_ICONS in touch.js (+ icons.js for items/powers), `.tc-ic` + small `.tc-lb` label.
+- Optimization mode (Settings, `settings.perf`): `applyPerf` in world.js lowers QUALITY (no shadows/post/bloom, 1/4 grass,
+  pixel ratio <= 0.75, fewer outer trees, shorter far plane) and `PERF.on` (gfx.js) makes every lite check true; the loading
+  screen goes static. Applied before the renderer is made; toggling rebuilds the menu renderer.
+- Loading: GLB base64 decode + parse run through heavy.js (`b64buf` via fetch(data:), `heavy()` serial queue, a frame gap
+  between jobs); the menu scene is compileAsync'd before it is revealed (`warmMenu`), match shaders before the reveal
+  (`warmUp`), the loading reel's house before it shows. Measure with tools/test/loadtest.mjs (PROF=1 for a profile).
+- Freddy outfit: `freddyOver(R, 2.3)` (taller than Granny), bat hidden; the first-person view shows his brown paw, no bat.
+- 1.3.3 devlog banner: tools/test/devlog133-page.js (render-devlog.mjs devlog133-page.js out.png), the real graveyard world
+  built with buildMap(7,'grave') + buildWorld.
 
 ## Where things stand / next steps
 - The "textures go missing / very dark" report (EXE + APK) is not reproduced in SwiftShader; fixes above cover the likely

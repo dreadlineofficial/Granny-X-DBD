@@ -4,6 +4,7 @@
 // an invisible procedural rig runs the usual walk / run / crouch / down / carried / caged / vault /
 // repair / heal / execution poses, and its joint rotations are copied onto the Mixamo skeleton.
 import * as THREE from 'three';
+import { b64buf, heavy } from './heavy.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
@@ -24,7 +25,7 @@ const boneKey = n => n.replace(/^mixamorig_?|_\d+$/g, '');
 
 async function bytes(name) {
   const el = document.getElementById('nb-' + name + '-glb');
-  if (el && el.textContent.trim()) { const s = atob(el.textContent.trim()), b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b.buffer; }
+  if (el && el.textContent.trim()) { return b64buf(el.textContent.trim()); }
   const dev = !!document.querySelector('script[type=importmap]');
   let last;
   for (const url of dev ? [`models/${name}.glb`, `public/models/${name}.glb`] : [`public/models/${name}.glb`, `models/${name}.glb`]) {
@@ -57,7 +58,7 @@ export function toBindPose(scene) {
 
 export function loadRealism(name) {
   if (loading[name]) return loading[name];
-  loading[name] = bytes(name).then(buf => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej))).then(g => {
+  loading[name] = bytes(name).then(buf => heavy(() => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)))).then(g => {
     for (const a of g.animations) a.tracks.length = 0;
     // (the file stores a mid-stride pose; every limb is re-aimed straight down on use, see armFix)
     g.scene.updateMatrixWorld(true);
@@ -218,14 +219,13 @@ const GR_AIM = [
   ['j_l_leg_02', 'j_l_leg_01', 'Bip01 L Thigh', 'Bip01 L Calf'], ['j_l_leg_01', 'j_l_foot', 'Bip01 L Calf', 'Bip01 L Foot'],
   ['j_r_leg_02', 'j_r_leg_01', 'Bip01 R Thigh', 'Bip01 R Calf'], ['j_r_leg_01', 'j_r_foot', 'Bip01 R Calf', 'Bip01 R Foot'],
 ];
-export function freddyOver(R, height = 2.05) {
+export function freddyOver(R, height = 2.3) { // (1.3.3: taller, and no bat: he hits with his paw)
   const M = models.freddy; if (!M) return false;
   const base = n => n.replace(/_\d+$/, '').replace(/_/g, ' ').trim();
   const src = {}; R.holder.traverse(o => { if (o.isBone) src[base(o.name)] = o; });
-  // Granny's body goes; her bat stays (it moves to Freddy's hand)
-  let bat = null; R.holder.traverse(o => { if (/BatBloody/i.test(o.name)) bat = o; });
-  const keep = new Set(); if (bat) bat.traverse(o => keep.add(o));
-  for (const m of R.meshes) if (!keep.has(m)) m.visible = false;
+  // Granny's body goes, her bat too: Freddy strikes with his paw (her swing drives his arm)
+  const bat = null, keep = new Set();
+  for (const m of R.meshes) m.visible = false;
   for (const a of R.aura) a.parent && a.parent.remove(a);
   const model = cloneSkinned(M.scene), s = height / 1.95 * M.fit.s;
   model.scale.setScalar(s); model.position.set(M.fit.x * s / M.fit.s, M.fit.y * s / M.fit.s, M.fit.z * s / M.fit.s);

@@ -3,6 +3,7 @@
 // embedded GLB (single-file build) or models/chucky.glb, normalised to doll size (~0.95m), then
 // cloned per use. Its own clips drive the skeleton: idle, walk, run, two knife attacks, a laugh.
 import * as THREE from 'three';
+import { b64buf, heavy } from './heavy.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { auraSkinMat } from './foremanGlb.js';
@@ -34,7 +35,7 @@ async function bytes() {
 export function loadChucky() {
   if (loading) return loading;
   loading = bytes()
-    .then(buf => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)))
+    .then(buf => heavy(() => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej))))
     .then(g => {
       // short clip names: IDLE_01, WALK_FORWARD, RUN_FORWARD, ATTACK-KNIFE-01, ...
       for (const c of g.animations) c.name = c.name.replace(/^.*\|(Chucky_)?/, '');

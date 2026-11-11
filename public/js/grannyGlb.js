@@ -7,6 +7,7 @@
 //    follows it (world-space rotation from rest), so she moves with her own animations: idle, Walk,
 //    Hit (bat swing), arrowHit (staggered), pepperHit (blinded), freezeTrap, Look, lookBed (bending).
 import * as THREE from 'three';
+import { b64buf, heavy } from './heavy.js';
 import { freddyOver } from './realism.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -16,7 +17,7 @@ import { GFX } from './gfx.js';
 const M = {}, loading = {}, waiters = {};
 async function bytes(name) {
   const el = document.getElementById('nb-' + name + '-glb');
-  if (el && el.textContent.trim()) { const s = atob(el.textContent.trim()), b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b.buffer; }
+  if (el && el.textContent.trim()) { return b64buf(el.textContent.trim()); }
   const dev = !!document.querySelector('script[type=importmap]');
   let last;
   for (const url of dev ? [`models/${name}.glb`, `public/models/${name}.glb`] : [`public/models/${name}.glb`, `models/${name}.glb`]) {
@@ -28,7 +29,7 @@ async function bytes(name) {
 const SPEC = { granny: { h: 1.82, yaw: 0 }, granny_anims: { anim: true }, grandpa: { h: 1.86, yaw: 0 }, spidermom: { h: 1.15, yaw: 0 }, slendrina: { h: 1.95, yaw: 0 }, angeline: { h: 1.88, yaw: Math.PI } };
 function load(name) {
   if (loading[name]) return loading[name];
-  loading[name] = bytes(name).then(buf => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej))).then(g => {
+  loading[name] = bytes(name).then(buf => heavy(() => new Promise((res, rej) => new GLTFLoader().parse(buf, '', res, rej)))).then(g => {
     const S = SPEC[name];
     if (S.anim) { M[name] = { g }; return M[name]; }
     if (name === 'angeline') { toBindPose(g.scene); } // animated in code from her T-pose (see animateAngeline)

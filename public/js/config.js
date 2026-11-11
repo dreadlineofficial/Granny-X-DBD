@@ -385,13 +385,18 @@ export const VERSION = '1.3.3';
 // automatically (tools/email-updates.mjs). Small tweaks leave it out and are never mailed.
 export const INBOX = [
   {
-    id: 'gdbd133', version: '1.3.3', date: 'Nov 2026', title: 'Better on phones', tag: 'Update',
+    id: 'gdbd133b', version: '1.3.3', date: 'Nov 2026', title: "New map: Slendrina's Graveyard", tag: 'Update',
     body: [
+      "NEW MAP: Slendrina's Graveyard. A ruined church with a bell tower, stone crypts, rows of graves, iron-fenced family plots, open graves and the gravedigger's shed, all in cold mist. Pick it in Play or vote for it in a lobby.",
+      'Settings > Optimization mode: runs smoother on slower PCs and phones (no shadows or glow, less grass, lower resolution).',
+      'Loading screens: shaders are prepared before things appear, so far fewer freezes before the match and on the menu.',
+      'Phones: the on-screen buttons have pictures now.',
       'Phones: move and resize the on-screen buttons the way you like them. Settings > Edit touch controls.',
       'Phones: skill checks take a tap ANYWHERE on the screen now (your other thumb is fine), and the game tells you when to tap.',
       'Phones: let go of USE in the middle of a repair or heal and it keeps going, so both thumbs are free. Move or tap USE to stop.',
       'Phones: emotes work (they could not be picked before).',
       "Angeline's arms no longer disappear into her dress.",
+      'Freddy Fazbear outfit: a bit taller, and he hits with his paw (no bat).',
     ],
   },
   {

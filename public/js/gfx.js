@@ -66,3 +66,6 @@ export function surface(name, base) {
     default: return null;
   }
 }
+
+// 1.3.3 optimization mode (Settings): on top of the graphics quality, everything takes the light path
+export const PERF = { on: false };

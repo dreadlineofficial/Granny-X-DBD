@@ -7,7 +7,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { initPhoto } from './pbr.js';
-import { realistic, nightEnv } from './gfx.js';
+import { realistic, nightEnv, PERF } from './gfx.js';
 import { KILLERS, SURVIVORS, SURV_PERKS, KILLER_PERKS, RULES, MODES, ITEMS, skinOf } from './config.js';
 import { buildWorld, updateWorld, pointBlocked, QUALITY } from './world.js';
 import { chuckyReady } from './chuckyGlb.js';
@@ -332,7 +332,7 @@ function killerViewParts(id, sk) {
   if (!R) return {};
   const out = {};
   if (R.glb || R.staticGlb) {
-    if (!GLB_KILLERS.has(id)) return {};
+    if (!GLB_KILLERS.has(id) || sk.glb === 'freddy') return {}; // (Freddy: plain fur arms, made in makeViewModel)
     const o = FP_OPT[id] || {};
     try { out.R = bakeArm(R.root, 'R', o); out.L = bakeArm(R.root, 'L', { ...o, noRigid: true, pitch: 0 }); } catch (e) { console.warn('first-person arms:', e); }
     if (!out.R) delete out.R; if (!out.L) delete out.L;
@@ -416,8 +416,8 @@ export class Game {
       this.scene.add(this.torchLight, this.torchLight.target);
       this.torchBest = Infinity;
     }
-    this.blood = new BloodDrops(this.scene, 900, this.settings.quality === 'potato' || this.settings.quality === 'low');
-    const lite = this.settings.quality === 'potato' || this.settings.quality === 'low';
+    this.blood = new BloodDrops(this.scene, 900, (this.settings.quality === 'potato' || this.settings.quality === 'low' || PERF.on));
+    const lite = (this.settings.quality === 'potato' || this.settings.quality === 'low' || PERF.on);
     this.scratches = new ScratchMarks(this.scene);
     this.decals = new BloodDecals(this.scene, { potato: 40, low: 80, medium: 160, high: 240 }[this.settings.quality] || 120, lite);
     this.blood.onLand = (x, z) => { if (this.decals.landBudget >= 1 && Math.random() < 0.35) { this.decals.landBudget--; this.decals.add(x, z, 0.12 + Math.random() * 0.2, 0); } };
@@ -1695,7 +1695,7 @@ export class Game {
   updateSpiderMom(dt, S) {
     const sp = S.spider;
     if (!sp) { if (this.spider) this.spider.R.root.visible = false; return; }
-    if (!this.spider && spiderMomReady()) { const R = makeSpiderMom(this.settings.quality === 'potato' || this.settings.quality === 'low'); if (R) { this.scene.add(R.root); this.spider = { R, x: sp.x, z: sp.z, yaw: sp.yaw }; } }
+    if (!this.spider && spiderMomReady()) { const R = makeSpiderMom((this.settings.quality === 'potato' || this.settings.quality === 'low' || PERF.on)); if (R) { this.scene.add(R.root); this.spider = { R, x: sp.x, z: sp.z, yaw: sp.yaw }; } }
     if (!this.spider) return;
     const P = this.spider, R = P.R;
     R.root.visible = true;

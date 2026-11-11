@@ -9,7 +9,7 @@ import { makeGrannyGlb, animateGranny, makeSlendrinaGlb, animateSlendrina, makeA
 import { makeRealism } from './realism.js';
 import { makeStaticKiller, animateStaticKiller, cloneStatic } from './glbModels.js';
 import { applySkinFx } from './skinfx.js';
-import { GFX, realistic, surface } from './gfx.js';
+import { GFX, realistic, surface, PERF } from './gfx.js';
 import { photoMaterial } from './pbr.js';
 
 // ---------- aura material ----------
@@ -33,7 +33,7 @@ const stdCache = new Map();
 // Graphics detail: 'lite' uses cheap Lambert materials and fewer polygons (for low-end laptops)
 export const DETAIL = { lite: false, seg: 1 };
 export function setDetail(quality) {
-  const lite = quality === 'potato' || quality === 'low';
+  const lite = quality === 'potato' || quality === 'low' || PERF.on;
   // the realistic look rounds characters out with more polygons
   const seg = realistic() ? ({ potato: 0.5, low: 0.8, medium: 1.35, high: 1.7 }[quality] ?? 1) : quality === 'potato' ? 0.5 : quality === 'low' ? 0.7 : 1;
   const style = GFX.style;
@@ -833,6 +833,9 @@ export function makeViewModel(id, vsk = {}, real = {}) {
       add(arm, G.box(0.03, 0.2, 0.15), mat(0xb8bcc0, { map: 'metal', metal: 0.85, rough: 0.25 }), 0, 0.09, -0.56);
     }
     tip.position.set(0, 0.18, -0.6); base.position.set(0, 0.02, -0.3);
+  } else if (id === 'granny' && vsk.glb === 'freddy') {
+    // Freddy Fazbear (1.3.3): no bat, a swipe of the paw
+    tip.position.set(0, 0.02, -0.14); base.position.set(0, 0, 0.05);
   } else if (id === 'granny') {
     // her bloody baseball bat: one piece, gripped at the handle, tip raised a little
     const bat = new THREE.Group(); bat.position.set(0, 0.0, -0.02); bat.rotation.x = 0.28; arm.add(bat);
