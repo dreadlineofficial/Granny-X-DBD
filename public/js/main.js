@@ -23,7 +23,7 @@ import { icon, POWER_ICON } from './icons.js';
 import { sound, loadClip } from './audio.js';
 import { showTrailer, trailerPlaying } from './trailer.js';
 import { showLoading, loadingUp, sceneShownAt } from './loadscreen.js';
-import { initTouch, MOBILE, mobileText } from './touch.js';
+import { initTouch, MOBILE, mobileText, openTouchEditor } from './touch.js';
 import { ACTIONS, bound, keyName, RESERVED } from './keybinds.js';
 import { hostRoom, joinRoom, relayAvailable, watchLobbies } from './net.js';
 import { ITEMS, KILLERS, SURVIVORS, SURV_PERKS, KILLER_PERKS, DEFAULT_SURV_PERKS, DEFAULT_KILLER_PERKS, BOT_NAMES, SNAP_RATE, NET_PROTOCOL, MODES, LORE, PERK_PRICES, PERK_SLOTS, SIDEKICKS, SKINS, INBOX, VERSION, CHAPTERS, CHAPTER_OF , NEWSLETTER , PLAY_K, PLAY_S, playable, POWER_LV, powerReach, GIFT_CHARS, PROFILE_BANNERS, PROFILE_TITLES } from './config.js';
@@ -475,6 +475,7 @@ function renderSettings() {
   renderCam();
   rebinding = null; renderKeybinds();
 }
+$('tc-edit').addEventListener('click', () => { sound.play('click'); openTouchEditor(); });
 $('set-name').addEventListener('input', e => { settings.name = e.target.value.trim().slice(0, 16) || 'Player'; saveSettings(); renderShowcase(); });
 const SHINT = {
   realistic: 'Realistic: real photo-scanned ground, stone, brick, wood, metal and bark (Medium/High), real fir trees, swaying grass, moonlight shafts, ambient occlusion, night colour vision and softer shadows. Needs a decent GPU: use Classic on older ' + (MOBILE ? 'phones' : 'laptops') + '.',

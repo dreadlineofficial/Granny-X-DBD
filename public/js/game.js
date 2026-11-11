@@ -1735,8 +1735,10 @@ export class Game {
     if (!this.emoteBar) {
       const bar = this.emoteBar = document.createElement('div'); bar.id = 'emote-bar'; bar.className = 'hidden';
       bar.innerHTML = [['Dance', 1], ['Wave', 2], ['Cheer', 3], ['Bow', 4]].map(([n, i]) => `<button data-emote="${i}"><b>${i}</b>${n}</button>`).join('');
-      bar.addEventListener('mousedown', ev => { const b = ev.target.closest('[data-emote]'); if (b) { ev.stopPropagation(); this.playEmote(+b.dataset.emote); } });
-      this.hud.appendChild(bar);
+      // pointerdown: a tap on a phone as well as a click (phones never sent the mousedown, and the touch layer
+      // sat on top of the HUD, so emotes could not be picked on mobile: the bar now sits above the touch controls)
+      bar.addEventListener('pointerdown', ev => { const b = ev.target.closest('[data-emote]'); if (b) { ev.preventDefault(); ev.stopPropagation(); this.playEmote(+b.dataset.emote); } });
+      if (MOBILE) { bar.classList.add('touch-emotes'); document.body.appendChild(bar); } else this.hud.appendChild(bar);
     }
     const open = force ?? this.emoteBar.classList.contains('hidden');
     if (open && (!me || me.role !== 'survivor' || me.st !== 'ok')) { if (me && me.role === 'killer') this.feed('Emotes are for survivors'); return; }
@@ -2634,6 +2636,7 @@ export class Game {
 
   dispose() {
     this.disposed = true;
+    if (this.emoteBar && this.emoteBar.parentNode === document.body) this.emoteBar.remove();
     this.unbind();
     if (document.pointerLockElement) { this.skipPause = true; document.exitPointerLock(); }
     sound.stopAll();

@@ -227,9 +227,10 @@ export function animateAngeline(R, s, dt) {
     A.up.updateWorldMatrix(true, false); B.neck.updateWorldMatrix(true, false);
     const out = Math.sign(_v1.setFromMatrixPosition(A.up.matrixWorld).sub(_v2.setFromMatrixPosition(B.neck.matrixWorld)).dot(RT)) || (sd === 'l' ? -1 : 1);
     const ph = sd === 'l' ? 0 : Math.PI;
-    // hanging, a little forward and away from the dress; trailing back as she glides; swaying
-    let up = d(0.18 - gl * 0.35 + Math.sin(t * 1.1 + ph) * 0.06, -1, out * 0.2);
-    let fo = d(0.18 - gl * 0.25 + Math.sin(t * 1.1 + ph + 0.6) * 0.06, -1, out * 0.12);
+    // hanging out from her sides and a little forward, like a ghost's reaching hands: her dress flares out like a
+    // bell, and arms held close (as before 1.3.3) sank into it. Trailing back a little as she glides; swaying
+    let up = d(0.3 - gl * 0.2 + Math.sin(t * 1.1 + ph) * 0.06, -1, out * (0.72 + gl * 0.1));
+    let fo = d(0.55 - gl * 0.25 + Math.sin(t * 1.1 + ph + 0.6) * 0.06, -1, out * (0.55 + gl * 0.1));
     // Yellow Eyes: arms spread wide, palms out
     if (ey > 0.01) { up.lerp(d(0.35, -0.35, out * 0.9), ey).normalize(); fo.lerp(d(0.5, -0.1, out * 0.8), ey).normalize(); }
     if (wind > 0) { up.lerp(d(-0.25, 0.9, out * 0.35), wind).normalize(); fo.lerp(d(0.3, 0.9, out * 0.15), wind).normalize(); }

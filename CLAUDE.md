@@ -57,7 +57,7 @@ three.js r160, plain ES modules in `public/js/`, bundled with esbuild into singl
 
 ## Identity / namespacing (keep separate from Nightbound)
 - localStorage prefix `gdbd_` (e.g. `gdbd_settings`, `gdbd_profile`).
-- Relay topics `grannydbd/v1/...`, PeerJS prefix `grannydbd-v1-`. `NET_PROTOCOL = 12`, `VERSION = '1.3.2'` (config.js).
+- Relay topics `grannydbd/v1/...`, PeerJS prefix `grannydbd-v1-`. `NET_PROTOCOL = 12`, `VERSION = '1.3.3'` (config.js).
 - Public lobbies (1.3): the host publishes a retained message on `grannydbd/v1/pub/<4-char stem>` (`H.advertise(info|null)`
   in net.js, refreshed on every lobby change and each 60 s) with an MQTT last will that clears it if the host drops.
   `watchLobbies(cb)` subscribes `grannydbd/v1/pub/+` on every broker; main.js renders the list + Quick Join.
@@ -221,6 +221,22 @@ the menu), `onlinestart.mjs` (host + client start a match through the local brok
   overlays132b.cjs. Devlog thumbnail = devlog132b-page.js (Freddy + outline); trailer thumbnail = trailerthumb132-page.js (owner: not
   about the skin, and it should look like a proper trailer: Granny big in front with the bat, the other three backlit in fog,
   logo + red OFFICIAL TRAILER bar, teal/red grade, grain). Angeline faces the camera at yaw ~ -0.3 (not PI).
+
+1.3.3 (Nov 2026, current; APK versionCode 20): phone fixes from Discord feedback + Angeline's arms.
+- Emotes on mobile: the bar listened for mousedown and sat inside the HUD, under the touch layer (#touch z 25): on phones it's
+  appended to body (`.touch-emotes`, z 28, big buttons) and uses pointerdown.
+- Skill checks on mobile (touch.js): while one is active a tap anywhere hits it (look/joystick area, any button incl. USE);
+  `.tc-sc` prompt under the dial ("GET READY…" in the warn beep, then "TAP ANYWHERE / when the needle hits the white zone",
+  just "TAP!" after 6, count in localStorage gdbd_sc_seen); the dial is 1.4x on mobile. USE latches: let go mid repair /
+  heal and E stays held (button `.on`) until the joystick moves, USE is tapped or the action ends (players let go of USE to
+  reach the dial, which cancelled the repair and the check).
+- Custom touch layout: Settings > Edit touch controls (`openTouchEditor`, mobile-only field). localStorage gdbd_touchlayout =
+  { pos: { 'survivor:use': {x, y, s} (centre as a screen fraction, own size), 'killer:rpower' ... }, scale, op }. Groups
+  survivor / killer (killer variants share slots; the R powers HEAR/TRAP/GAZE/LULLABY share 'rpower'). A touched group is
+  saved whole (`applyLayout` places `.placed` buttons fixed; the rest stay in the flex flow, zoomed by `scale`).
+- Angeline: hanging arms held out from her sides and a bit forward (`animateAngeline`, up/fo dirs); held close they sank
+  into her bell-shaped dress.
+- Test: tools/test/mobile133.mjs (phone emulation: editor drag, emote tap, skill check by a left tap, USE latch at a gen).
 
 ## Where things stand / next steps
 - The "textures go missing / very dark" report (EXE + APK) is not reproduced in SwiftShader; fixes above cover the likely

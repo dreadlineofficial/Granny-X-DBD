@@ -380,10 +380,20 @@ export const NEWSLETTER = '';
 export const PLAY_K = ['granny', 'grandpa', 'slendrina', 'angeline'], PLAY_S = ['mara', 'eli', 'june', 'tomas'];
 export const playable = c => PLAY_K.includes(c) || PLAY_S.includes(c);
 export const DISCORD = 'https://discord.gg/WXvAJ2sgVP';
-export const VERSION = '1.3.2';
+export const VERSION = '1.3.3';
 // Inbox entries with `email: true` are big updates: they are emailed to newsletter subscribers
 // automatically (tools/email-updates.mjs). Small tweaks leave it out and are never mailed.
 export const INBOX = [
+  {
+    id: 'gdbd133', version: '1.3.3', date: 'Nov 2026', title: 'Better on phones', tag: 'Update',
+    body: [
+      'Phones: move and resize the on-screen buttons the way you like them. Settings > Edit touch controls.',
+      'Phones: skill checks take a tap ANYWHERE on the screen now (your other thumb is fine), and the game tells you when to tap.',
+      'Phones: let go of USE in the middle of a repair or heal and it keeps going, so both thumbs are free. Move or tap USE to stop.',
+      'Phones: emotes work (they could not be picked before).',
+      "Angeline's arms no longer disappear into her dress.",
+    ],
+  },
   {
     id: 'gdbd132', version: '1.3.2', date: 'Nov 2026', title: 'Freddy Fazbear, profiles and gifts', tag: 'Update',
     gift: { embers: 1000, label: 'Update gift: 1,000 Embers' },
